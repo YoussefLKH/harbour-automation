@@ -33,6 +33,14 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.log('⚠ Supabase keys missing — applications save to a local JSON file for now.');
 }
 
+// ── Stripe ──
+const crypto = require('crypto');
+const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+if (stripe) console.log('✓ Stripe connected'); else console.log('⚠ STRIPE_SECRET_KEY missing — payment links disabled.');
+
+// ── Email ──
+const mailer = require('./mailer');
+
 // ── Health ──
 app.get('/api/health', (_req, res) => res.json({
     ok: true,
@@ -178,12 +186,17 @@ app.post('/api/apply/submit', async (req, res) => {
         };
 
         if (supabase) {
-            const { error } = await supabase.from('applications').insert({
+            const base = {
                 full_name: record.full_name, business_name: record.business_name,
                 email: record.email, phone: record.phone, industry: record.industry,
                 team_size: record.team_size, pain_points: record.pain_points,
                 biggest_challenge: record.biggest_challenge, status: 'pending',
-            });
+            };
+            let { error } = await supabase.from('applications').insert({ ...base, transcript: record.transcript, plan: record.plan });
+            // If the admin migration hasn't been run yet, transcript/plan columns won't exist — fall back gracefully
+            if (error && /transcript|plan|column/i.test(error.message)) {
+                ({ error } = await supabase.from('applications').insert(base));
+            }
             if (error) throw error;
         } else {
             // Local fallback so nothing is lost during dev
@@ -335,6 +348,159 @@ app.post('/api/invite/redeem', async (req, res) => {
         });
         await supabase.from('invites').update({ status: 'accepted' }).eq('id', invite.id);
         res.json({ success: true, email: invite.email });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ════════════════════════════════════════════════════════════
+// ADMIN
+// ════════════════════════════════════════════════════════════
+function requireAdmin(req, res, next) {
+    authClient(req, res, () => {
+        if (!req.isAdmin) return res.status(403).json({ error: 'Admins only.' });
+        next();
+    });
+}
+
+// ── Applications ──
+app.get('/api/admin/applications', requireAdmin, async (req, res) => {
+    const { data, error } = await supabase.from('applications').select('*').order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ applications: data || [] });
+});
+
+app.patch('/api/admin/applications/:id', requireAdmin, async (req, res) => {
+    const updates = {};
+    if (req.body.status) updates.status = req.body.status;
+    if (req.body.admin_notes !== undefined) updates.admin_notes = req.body.admin_notes;
+    if (req.body.status) updates.reviewed_at = new Date().toISOString();
+    const { error } = await supabase.from('applications').update(updates).eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
+// ── Accept an application → create invite + send activation link ──
+app.post('/api/admin/applications/:id/accept', requireAdmin, async (req, res) => {
+    try {
+        const { data: appn } = await supabase.from('applications').select('*').eq('id', req.params.id).single();
+        if (!appn) return res.status(404).json({ error: 'Application not found.' });
+
+        const token = crypto.randomBytes(24).toString('hex');
+        await supabase.from('invites').insert({
+            application_id: appn.id, email: appn.email, token, status: 'sent',
+        });
+        await supabase.from('applications').update({ status: 'accepted', reviewed_at: new Date().toISOString() }).eq('id', appn.id);
+
+        const link = `${process.env.APP_URL || ''}/login.html?invite=${token}`;
+        let emailed = false;
+        try { emailed = await mailer.sendActivationEmail(appn.email, appn.full_name, link); }
+        catch (e) { console.error('Activation email failed:', e.message); }
+
+        res.json({ success: true, link, emailed });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Clients ──
+app.get('/api/admin/clients', requireAdmin, async (req, res) => {
+    const { data: profiles } = await supabase.from('profiles').select('*').eq('role', 'client').order('created_at', { ascending: false });
+    res.json({ clients: profiles || [] });
+});
+
+app.get('/api/admin/clients/:id', requireAdmin, async (req, res) => {
+    const id = req.params.id;
+    const [{ data: profile }, { data: systems }, { data: invoices }, { data: thread }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', id).single(),
+        supabase.from('systems').select('*').eq('client_id', id).order('created_at'),
+        supabase.from('invoices').select('*').eq('client_id', id).order('created_at', { ascending: false }),
+        supabase.from('support_threads').select('*').eq('client_id', id).single(),
+    ]);
+    let messages = [];
+    if (thread) { const { data: m } = await supabase.from('support_messages').select('*').eq('thread_id', thread.id).order('created_at'); messages = m || []; }
+    res.json({ profile, systems: systems || [], invoices: invoices || [], thread: thread || null, messages });
+});
+
+app.post('/api/admin/clients/:id/systems', requireAdmin, async (req, res) => {
+    const { name, type, status, description } = req.body;
+    if (!name) return res.status(400).json({ error: 'System name required.' });
+    const { error } = await supabase.from('systems').insert({
+        client_id: req.params.id, name, type: type || null, status: status || 'building', description: description || '',
+    });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
+app.patch('/api/admin/systems/:id', requireAdmin, async (req, res) => {
+    const { error } = await supabase.from('systems').update({ status: req.body.status }).eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
+// ── Create invoice + Stripe one-time payment link ──
+app.post('/api/admin/clients/:id/invoices', requireAdmin, async (req, res) => {
+    try {
+        if (!stripe) return res.status(503).json({ error: 'Stripe not configured.' });
+        const { description, amount } = req.body;            // amount in dollars
+        const cents = Math.round(parseFloat(amount) * 100);
+        if (!description || !cents || cents < 50) return res.status(400).json({ error: 'Description and a valid amount are required.' });
+
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', req.params.id).single();
+
+        const session = await stripe.checkout.sessions.create({
+            mode: 'payment',
+            customer_email: profile?.email || undefined,
+            line_items: [{
+                price_data: { currency: 'cad', product_data: { name: description }, unit_amount: cents },
+                quantity: 1,
+            }],
+            success_url: `${process.env.APP_URL || ''}/dashboard.html?paid=1`,
+            cancel_url: `${process.env.APP_URL || ''}/dashboard.html`,
+        });
+
+        const { error } = await supabase.from('invoices').insert({
+            client_id: req.params.id, description, amount_cents: cents, currency: 'cad',
+            status: 'sent', payment_url: session.url, stripe_session_id: session.id,
+        });
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ success: true, payment_url: session.url });
+    } catch (e) { console.error('invoice error:', e.message); res.status(500).json({ error: e.message }); }
+});
+
+// ── Admin support ──
+app.get('/api/admin/support', requireAdmin, async (req, res) => {
+    const { data: threads } = await supabase.from('support_threads').select('*').order('last_message_at', { ascending: false, nullsFirst: false });
+    // attach client names
+    const out = [];
+    for (const t of (threads || [])) {
+        const { data: p } = await supabase.from('profiles').select('full_name,business_name,email').eq('id', t.client_id).single();
+        out.push({ ...t, client: p });
+    }
+    res.json({ threads: out });
+});
+
+app.get('/api/admin/support/:threadId', requireAdmin, async (req, res) => {
+    const { data: messages } = await supabase.from('support_messages').select('*').eq('thread_id', req.params.threadId).order('created_at');
+    await supabase.from('support_threads').update({ unread_by_admin: false }).eq('id', req.params.threadId);
+    res.json({ messages: messages || [] });
+});
+
+app.post('/api/admin/support/:threadId/reply', requireAdmin, async (req, res) => {
+    try {
+        const text = (req.body.text || '').trim();
+        if (!text) return res.status(400).json({ error: 'Reply required.' });
+        const { data: thread } = await supabase.from('support_threads').select('*').eq('id', req.params.threadId).single();
+        await supabase.from('support_messages').insert({
+            thread_id: req.params.threadId, sender_role: 'admin', sender_name: 'Youssef — Harbour', body: text,
+        });
+        await supabase.from('support_threads').update({
+            last_message: 'Youssef: ' + text.slice(0, 100), last_message_at: new Date().toISOString(),
+            unread_by_admin: false, unread_by_client: true,
+        }).eq('id', req.params.threadId);
+
+        // notify client by email
+        if (thread) {
+            const { data: p } = await supabase.from('profiles').select('email,full_name').eq('id', thread.client_id).single();
+            if (p?.email) mailer.sendSupportReplyEmail(p.email, p.full_name, text).catch(e => console.error('reply email:', e.message));
+        }
+        res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

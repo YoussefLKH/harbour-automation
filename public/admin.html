@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin — Harbour Automation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+        body { background: var(--cream); }
+        .layout { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+        .side { background: var(--deep); color: #fff; padding: 24px 16px; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+        .side .logo { color: #fff; padding: 0 8px 6px; font-size: 1.2rem; } .side .logo span { color: var(--seafoam); }
+        .admin-tag { font-size: 0.7rem; color: var(--seafoam); padding: 0 8px 22px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: var(--radius); color: rgba(255,255,255,0.65); font-size: 0.92rem; font-weight: 500; cursor: pointer; border: none; background: none; width: 100%; text-align: left; transition: all 0.15s; font-family: 'Inter', sans-serif; }
+        .nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .nav-item.active { background: rgba(94,234,212,0.14); color: var(--seafoam); }
+        .nav-item svg { width: 19px; height: 19px; flex-shrink: 0; }
+        .nav-count { margin-left: auto; background: var(--coral); color: #fff; font-size: 0.7rem; font-weight: 700; padding: 1px 8px; border-radius: 100px; }
+        .side-foot { margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .main { padding: 36px 44px; max-width: 1080px; }
+        .page { display: none; animation: fade 0.4s ease; } .page.active { display: block; }
+        @keyframes fade { from{opacity:0;transform:translateY(12px);} to{opacity:1;transform:none;} }
+        .page-title { font-size: 2rem; margin-bottom: 6px; } .page-sub { color: var(--muted); margin-bottom: 28px; }
+        .card { background: #fff; border: 1px solid var(--line-2); border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-sm); margin-bottom: 14px; }
+        .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+        .badge { font-size: 0.72rem; font-weight: 700; padding: 4px 11px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .badge.pending { background: rgba(244,162,97,0.16); color: #b45309; }
+        .badge.accepted, .badge.live, .badge.paid { background: rgba(20,184,166,0.12); color: var(--ocean); }
+        .badge.rejected { background: rgba(255,106,69,0.12); color: var(--coral-2); }
+        .badge.reviewing, .badge.sent, .badge.building { background: rgba(59,130,200,0.12); color: #1d4ed8; }
+        .name { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--ink); }
+        .meta { font-size: 0.85rem; color: var(--muted); }
+        .btn-sm { padding: 8px 16px; font-size: 0.84rem; border-radius: 100px; border: none; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 600; }
+        .btn-accept { background: var(--grad-ocean); color: #fff; }
+        .btn-reject { background: #fff; color: var(--coral-2); border: 1.5px solid var(--line); }
+        .btn-soft { background: var(--sand); color: var(--ink); }
+        .detail { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); display: none; }
+        .detail.open { display: block; }
+        .kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 14px; font-size: 0.9rem; margin-bottom: 16px; }
+        .kv .k { color: var(--muted); } .kv .v { color: var(--ink); }
+        .block-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; margin: 14px 0 8px; }
+        .transcript { background: var(--cream); border-radius: var(--radius); padding: 14px 16px; font-size: 0.86rem; color: var(--slate); white-space: pre-wrap; max-height: 220px; overflow-y: auto; line-height: 1.6; }
+        .plan-box { background: var(--grad-soft); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 16px; }
+        .plan-box h4 { font-family: 'Inter',sans-serif; color: var(--ink); font-size: 0.95rem; margin-bottom: 4px; }
+        .plan-rec { padding: 8px 0; border-bottom: 1px solid var(--line-2); font-size: 0.88rem; }
+        .linkbox { display: flex; gap: 8px; margin-top: 12px; }
+        .linkbox input { flex: 1; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: var(--radius); font-size: 0.84rem; color: var(--ocean); }
+        .field { margin-bottom: 12px; } .field label { display:block; font-size: 0.82rem; font-weight: 600; color: var(--ink); margin-bottom: 5px; }
+        .field input, .field select, .field textarea { width: 100%; padding: 11px 13px; border: 1.5px solid var(--line); border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 0.9rem; }
+        .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--ocean); }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .back-link { color: var(--ocean); font-weight: 600; cursor: pointer; font-size: 0.9rem; margin-bottom: 16px; display: inline-block; }
+        .muted-empty { text-align: center; color: var(--muted); padding: 40px; }
+        .chat-msgs { max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
+        .b { padding: 11px 15px; border-radius: 14px; font-size: 0.9rem; max-width: 80%; white-space: pre-wrap; }
+        .b.admin { background: var(--grad-ocean); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .b.client { background: var(--sand); color: var(--slate); align-self: flex-start; border-bottom-left-radius: 4px; }
+        .toast { position: fixed; bottom: 24px; right: 24px; background: var(--deep); color: #fff; padding: 14px 20px; border-radius: var(--radius); box-shadow: var(--shadow-lg); font-size: 0.9rem; opacity: 0; transform: translateY(10px); transition: all 0.3s; z-index: 999; }
+        .toast.show { opacity: 1; transform: none; }
+        @media (max-width:820px){ .layout{grid-template-columns:1fr;} .side{position:static;height:auto;} .main{padding:24px;} .grid2{grid-template-columns:1fr;} }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <aside class="side">
+        <a href="/" class="logo">
+            <svg class="logo-mark" viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="11" fill="#0e7490"/><path d="M20 8 L24 15 H16 L20 8Z" fill="#ff7a59"/><rect x="17.5" y="15" width="5" height="12" fill="#5eead4"/><path d="M16 27 H24 L25.5 30 H14.5 L16 27Z" fill="#fff"/><path d="M9 33 q3 -3 6 0 t6 0 t6 0" stroke="#99f6e4" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+            Harbour<span>.</span>
+        </a>
+        <div class="admin-tag">Admin</div>
+        <button class="nav-item active" data-page="applications" onclick="nav('applications')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Applications <span class="nav-count" id="appCount" style="display:none;">0</span></button>
+        <button class="nav-item" data-page="clients" onclick="nav('clients')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg> Clients</button>
+        <button class="nav-item" data-page="support" onclick="nav('support')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Support <span class="nav-count" id="supCount" style="display:none;">0</span></button>
+        <div class="side-foot">
+            <button class="nav-item" onclick="signOut()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Sign out</button>
+        </div>
+    </aside>
+
+    <main class="main">
+        <section class="page active" id="page-applications">
+            <h1 class="page-title">Applications</h1>
+            <p class="page-sub">Review applicants, read their AI interview, then accept or pass.</p>
+            <div id="apps-list"><div class="muted-empty">Loading…</div></div>
+        </section>
+
+        <section class="page" id="page-clients">
+            <h1 class="page-title">Clients</h1>
+            <p class="page-sub">Manage active clients, their systems, and billing.</p>
+            <div id="clients-list"><div class="muted-empty">Loading…</div></div>
+            <div id="client-detail" style="display:none;"></div>
+        </section>
+
+        <section class="page" id="page-support">
+            <h1 class="page-title">Support</h1>
+            <p class="page-sub">Client conversations.</p>
+            <div id="support-wrap"><div class="muted-empty">Loading…</div></div>
+        </section>
+    </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const cfg = await (await fetch('/api/config')).json();
+const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+const { data: { session } } = await sb.auth.getSession();
+if (!session) location.replace('/login.html');
+
+async function api(path, opts = {}) {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, ...(opts.headers || {}) } });
+    if (res.status === 401) { location.replace('/login.html'); return; }
+    if (res.status === 403) { location.replace('/dashboard.html'); return; }
+    return res.json();
+}
+const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const money = c => '$' + ((c || 0) / 100).toFixed(2);
+const toast = (m) => { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); };
+window._copy = (id) => { const el = document.getElementById(id); el.select(); navigator.clipboard.writeText(el.value); toast('Link copied ✓'); };
+
+// Guard: must be admin
+const me = await api('/api/me');
+if (!me?.isAdmin) location.replace('/dashboard.html');
+
+// ════ APPLICATIONS ════
+async function loadApps() {
+    const { applications } = await api('/api/admin/applications');
+    const pending = applications.filter(a => a.status === 'pending').length;
+    const badge = document.getElementById('appCount');
+    if (pending) { badge.style.display = 'inline-block'; badge.textContent = pending; } else badge.style.display = 'none';
+
+    const el = document.getElementById('apps-list');
+    if (!applications.length) { el.innerHTML = '<div class="muted-empty">No applications yet. They\'ll appear here as people apply.</div>'; return; }
+    el.innerHTML = applications.map(a => {
+        const plan = a.plan || {};
+        const recs = (plan.recommendations || []).map((r,i) => `<div class="plan-rec"><b>${i+1}. ${esc(r.title||'')}</b> — ${esc(r.desc||'')} ${r.impact?`<span style="color:var(--ocean);">(${esc(r.impact)})</span>`:''}</div>`).join('');
+        return `<div class="card">
+            <div class="row">
+                <div><div class="name">${esc(a.full_name)} <span class="meta">· ${esc(a.business_name||'—')}</span></div>
+                    <div class="meta">${esc(a.industry||'')} · ${esc(a.email)} · ${esc(a.phone||'')}</div></div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <span class="badge ${a.status}">${a.status}</span>
+                    <button class="btn-sm btn-soft" onclick="toggleDetail('${a.id}')">View</button>
+                </div>
+            </div>
+            <div class="detail" id="d-${a.id}">
+                <div class="block-label">AI Interview</div>
+                <div class="transcript">${esc(a.transcript) || 'No transcript saved.'}</div>
+                ${plan.headline ? `<div class="block-label">AI Plan</div><div class="plan-box"><h4>${esc(plan.headline)}</h4><p class="meta" style="margin-bottom:8px;">${esc(plan.summary||'')}</p>${recs}</div>` : ''}
+                <div id="accept-result-${a.id}"></div>
+                <div style="display:flex;gap:8px;margin-top:16px;">
+                    ${a.status !== 'accepted' ? `<button class="btn-sm btn-accept" onclick="acceptApp('${a.id}')">✓ Accept &amp; onboard</button>` : ''}
+                    ${a.status !== 'rejected' && a.status !== 'accepted' ? `<button class="btn-sm btn-reject" onclick="setStatus('${a.id}','rejected')">Pass</button>` : ''}
+                    ${a.status === 'pending' ? `<button class="btn-sm btn-soft" onclick="setStatus('${a.id}','reviewing')">Mark in talks</button>` : ''}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+window.toggleDetail = (id) => document.getElementById('d-' + id).classList.toggle('open');
+window.setStatus = async (id, status) => { await api('/api/admin/applications/' + id, { method: 'PATCH', body: JSON.stringify({ status }) }); toast('Updated'); loadApps(); };
+window.acceptApp = async (id) => {
+    const r = await api('/api/admin/applications/' + id + '/accept', { method: 'POST' });
+    if (!r?.success) { toast(r?.error || 'Failed'); return; }
+    document.getElementById('accept-result-' + id).innerHTML =
+        `<div class="block-label" style="margin-top:16px;">Activation link ${r.emailed ? '· emailed ✓' : '(email off — copy &amp; send)'}</div>
+         <div class="linkbox"><input id="lnk-${id}" value="${r.link}" readonly /><button class="btn-sm btn-accept" onclick="_copy('lnk-${id}')">Copy</button></div>`;
+    toast(r.emailed ? 'Accepted & emailed ✓' : 'Accepted ✓');
+    loadAppsKeepOpen(id);
+};
+async function loadAppsKeepOpen(id) { await loadApps(); document.getElementById('d-' + id)?.classList.add('open'); }
+
+// ════ CLIENTS ════
+async function loadClients() {
+    document.getElementById('client-detail').style.display = 'none';
+    const listEl = document.getElementById('clients-list'); listEl.style.display = 'block';
+    const { clients } = await api('/api/admin/clients');
+    if (!clients.length) { listEl.innerHTML = '<div class="muted-empty">No clients yet. Accept an application to onboard your first.</div>'; return; }
+    listEl.innerHTML = clients.map(c => `<div class="card"><div class="row">
+        <div><div class="name">${esc(c.business_name || c.full_name)}</div><div class="meta">${esc(c.full_name)} · ${esc(c.email)}</div></div>
+        <button class="btn-sm btn-soft" onclick="openClient('${c.id}')">Manage →</button>
+    </div></div>`).join('');
+}
+window.openClient = async (id) => {
+    document.getElementById('clients-list').style.display = 'none';
+    const d = document.getElementById('client-detail'); d.style.display = 'block';
+    d.innerHTML = '<div class="muted-empty">Loading…</div>';
+    const { profile, systems, invoices } = await api('/api/admin/clients/' + id);
+    const sysHTML = systems.map(s => `<div class="row" style="padding:8px 0;border-bottom:1px solid var(--line-2);">
+        <div><b>${esc(s.name)}</b> <span class="meta">${esc(s.description||'')}</span></div>
+        <select onchange="updateSystem('${s.id}', this.value)" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--line);">
+            ${['building','live','paused'].map(st => `<option ${s.status===st?'selected':''}>${st}</option>`).join('')}
+        </select></div>`).join('') || '<div class="meta">No systems yet.</div>';
+    const invHTML = invoices.map(i => `<div class="row" style="padding:8px 0;border-bottom:1px solid var(--line-2);">
+        <div><b>${esc(i.description)}</b> <span class="meta">${money(i.amount_cents)}</span></div>
+        <div style="display:flex;gap:8px;align-items:center;"><span class="badge ${i.status}">${i.status}</span>${i.payment_url?`<a href="${i.payment_url}" target="_blank" class="btn-sm btn-soft">Link ↗</a>`:''}</div>
+    </div>`).join('') || '<div class="meta">No invoices yet.</div>';
+
+    d.innerHTML = `<span class="back-link" onclick="loadClients()">← All clients</span>
+        <div class="card"><div class="name" style="font-size:1.4rem;">${esc(profile.business_name||profile.full_name)}</div>
+            <div class="meta">${esc(profile.full_name)} · ${esc(profile.email)} · ${esc(profile.phone||'')}</div></div>
+
+        <div class="card"><div class="row" style="margin-bottom:10px;"><h3 class="name" style="font-size:1.1rem;">Systems</h3></div>
+            ${sysHTML}
+            <div class="block-label" style="margin-top:16px;">Add a system</div>
+            <div class="grid2">
+                <div class="field"><input id="sys-name" placeholder="e.g. AI Receptionist" /></div>
+                <div class="field"><select id="sys-type"><option value="receptionist">Receptionist</option><option value="bookkeeping">Bookkeeping</option><option value="support">Customer Service</option><option value="followup">Lead Follow-up</option></select></div>
+            </div>
+            <div class="field"><input id="sys-desc" placeholder="Short description" /></div>
+            <button class="btn-sm btn-accept" onclick="addSystem('${id}')">+ Add system (building)</button>
+        </div>
+
+        <div class="card"><div class="row" style="margin-bottom:10px;"><h3 class="name" style="font-size:1.1rem;">Billing</h3></div>
+            ${invHTML}
+            <div class="block-label" style="margin-top:16px;">Create invoice → Stripe payment link</div>
+            <div class="grid2">
+                <div class="field"><input id="inv-desc" placeholder="e.g. Setup fee — AI Receptionist" /></div>
+                <div class="field"><input id="inv-amt" type="number" placeholder="Amount (CAD)" min="1" step="0.01" /></div>
+            </div>
+            <button class="btn-sm btn-accept" onclick="createInvoice('${id}')">💳 Generate payment link</button>
+            <div id="inv-result"></div>
+        </div>`;
+};
+window.updateSystem = async (id, status) => { await api('/api/admin/systems/' + id, { method: 'PATCH', body: JSON.stringify({ status }) }); toast('System updated'); };
+window.addSystem = async (clientId) => {
+    const name = document.getElementById('sys-name').value.trim();
+    if (!name) { toast('Enter a system name'); return; }
+    await api('/api/admin/clients/' + clientId + '/systems', { method: 'POST', body: JSON.stringify({
+        name, type: document.getElementById('sys-type').value, description: document.getElementById('sys-desc').value, status: 'building',
+    }) });
+    toast('System added ✓'); openClient(clientId);
+};
+window.createInvoice = async (clientId) => {
+    const description = document.getElementById('inv-desc').value.trim();
+    const amount = document.getElementById('inv-amt').value;
+    if (!description || !amount) { toast('Add description + amount'); return; }
+    const r = await api('/api/admin/clients/' + clientId + '/invoices', { method: 'POST', body: JSON.stringify({ description, amount }) });
+    if (!r?.success) { toast(r?.error || 'Failed'); return; }
+    document.getElementById('inv-result').innerHTML = `<div class="block-label" style="margin-top:14px;">Payment link</div>
+        <div class="linkbox"><input id="paylnk" value="${r.payment_url}" readonly /><button class="btn-sm btn-accept" onclick="_copy('paylnk')">Copy</button></div>`;
+    toast('Payment link created ✓');
+};
+
+// ════ SUPPORT ════
+let supThread = null, supPoll = null;
+async function loadSupport() {
+    const { threads } = await api('/api/admin/support');
+    const unread = threads.filter(t => t.unread_by_admin).length;
+    const badge = document.getElementById('supCount');
+    if (unread) { badge.style.display = 'inline-block'; badge.textContent = unread; } else badge.style.display = 'none';
+    const wrap = document.getElementById('support-wrap');
+    if (!threads.length) { wrap.innerHTML = '<div class="muted-empty">No conversations yet.</div>'; return; }
+    wrap.innerHTML = threads.map(t => `<div class="card"><div class="row">
+        <div><div class="name" style="font-size:1.05rem;">${esc(t.client?.business_name || t.client?.full_name || 'Client')} ${t.unread_by_admin?'<span class="badge rejected" style="background:var(--coral);color:#fff;">new</span>':''}</div>
+            <div class="meta">${esc(t.last_message || 'No messages')}</div></div>
+        <button class="btn-sm btn-soft" onclick="openThread('${t.id}','${esc(t.client?.full_name||'')}')">Open →</button>
+    </div>`).join('');
+}
+window.openThread = async (threadId, name) => {
+    supThread = threadId;
+    const { messages } = await api('/api/admin/support/' + threadId);
+    const wrap = document.getElementById('support-wrap');
+    wrap.innerHTML = `<span class="back-link" onclick="backToThreads()">← All conversations</span>
+        <div class="card"><h3 class="name" style="font-size:1.1rem;margin-bottom:6px;">${esc(name)}</h3>
+        <div class="chat-msgs" id="adminMsgs">${messages.map(m => `<div class="b ${m.sender_role}">${esc(m.body)}</div>`).join('')}</div>
+        <div style="display:flex;gap:8px;"><textarea id="reply" rows="2" placeholder="Type your reply…" style="flex:1;padding:11px 13px;border:1.5px solid var(--line);border-radius:var(--radius);resize:none;font-family:'Inter',sans-serif;"></textarea>
+        <button class="btn-sm btn-accept" onclick="sendReply()">Send</button></div></div>`;
+    const m = document.getElementById('adminMsgs'); m.scrollTop = m.scrollHeight;
+    clearInterval(supPoll); supPoll = setInterval(refreshThread, 4000);
+};
+async function refreshThread() {
+    if (!supThread) return;
+    const { messages } = await api('/api/admin/support/' + supThread);
+    const m = document.getElementById('adminMsgs'); if (!m) return;
+    m.innerHTML = messages.map(x => `<div class="b ${x.sender_role}">${esc(x.body)}</div>`).join('');
+    m.scrollTop = m.scrollHeight;
+}
+window.backToThreads = () => { clearInterval(supPoll); supThread = null; loadSupport(); };
+window.sendReply = async () => {
+    const t = document.getElementById('reply'); const text = t.value.trim(); if (!text) return;
+    t.value = '';
+    await api('/api/admin/support/' + supThread + '/reply', { method: 'POST', body: JSON.stringify({ text }) });
+    refreshThread();
+};
+
+// ════ NAV ════
+window.nav = (page) => {
+    document.querySelectorAll('.nav-item[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
+    clearInterval(supPoll);
+    if (page === 'applications') loadApps();
+    if (page === 'clients') loadClients();
+    if (page === 'support') loadSupport();
+};
+window.signOut = async () => { await sb.auth.signOut(); location.replace('/login.html'); };
+
+// initial
+loadApps();

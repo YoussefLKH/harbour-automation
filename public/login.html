@@ -59,9 +59,16 @@ const cfg = await (await fetch('/api/config')).json();
 const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 window._sb = sb;
 
-// Already signed in? go to dashboard
+async function routeAfterAuth(session) {
+    try {
+        const me = await (await fetch('/api/me', { headers: { Authorization: 'Bearer ' + session.access_token } })).json();
+        location.replace(me.isAdmin ? '/admin.html' : '/dashboard.html');
+    } catch { location.replace('/dashboard.html'); }
+}
+
+// Already signed in? route accordingly
 const { data: { session } } = await sb.auth.getSession();
-if (session) location.replace('/dashboard.html');
+if (session) routeAfterAuth(session);
 
 // Invite mode?
 const inviteToken = new URLSearchParams(location.search).get('invite');
@@ -75,9 +82,9 @@ window._login = async function () {
     const password = document.getElementById('password').value;
     const btn = document.getElementById('loginBtn'); const err = document.getElementById('err');
     err.textContent = ''; btn.disabled = true; btn.textContent = 'Signing in…';
-    const { error } = await sb.auth.signInWithPassword({ email, password });
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) { err.textContent = error.message; btn.disabled = false; btn.textContent = 'Sign in →'; return; }
-    location.replace('/dashboard.html');
+    routeAfterAuth(data.session);
 };
 
 window._redeem = async function () {
