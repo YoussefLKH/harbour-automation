@@ -286,7 +286,7 @@ app.get('/api/me/overview', authClient, async (req, res) => {
         const latest = reports?.[0] || {};
         const openInv = (invoices || []).filter(i => i.status === 'sent');
         res.json({
-            systemsLive: (systems || []).filter(s => s.status === 'live').length,
+            systemsLive: (systems || []).filter(s => s.status === 'active').length,
             systemsTotal: (systems || []).length,
             hoursSaved: latest.hours_saved || 0,
             callsHandled: latest.calls_handled || 0,
@@ -456,20 +456,75 @@ app.get('/api/admin/clients/:id', requireAdmin, async (req, res) => {
     res.json({ profile, systems: systems || [], invoices: invoices || [], thread: thread || null, messages });
 });
 
-app.post('/api/admin/clients/:id/systems', requireAdmin, async (req, res) => {
-    const { name, type, status, description } = req.body;
-    if (!name) return res.status(400).json({ error: 'System name required.' });
-    const { error } = await supabase.from('systems').insert({
-        client_id: req.params.id, name, type: type || null, status: status || 'building', description: description || '',
+// Helper: create a one-time Stripe Checkout link (CAD)
+async function createCheckout(productName, cents, email) {
+    if (!stripe || !cents || cents < 50) return null;
+    const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        customer_email: email || undefined,
+        line_items: [{ price_data: { currency: 'cad', product_data: { name: productName }, unit_amount: cents }, quantity: 1 }],
+        success_url: `${process.env.APP_URL || ''}/dashboard.html?paid=1`,
+        cancel_url: `${process.env.APP_URL || ''}/dashboard.html`,
     });
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true });
+    return session.url;
+}
+
+// Build deposit ($50) + balance (quote − deposit) payment links for a system
+async function buildSystemLinks(name, quote_cents, deposit_cents, email) {
+    const dep = Math.min(deposit_cents || 5000, quote_cents);
+    const bal = Math.max(quote_cents - (deposit_cents || 5000), 0);
+    const deposit_url = await createCheckout(`Deposit — ${name}`, dep, email);
+    const balance_url = bal > 0 ? await createCheckout(`Balance — ${name}`, bal, email) : null;
+    return { deposit_url, balance_url };
+}
+
+// ── Add a system to a client (with quote, ETA, deposit/balance links) ──
+app.post('/api/admin/clients/:id/systems', requireAdmin, async (req, res) => {
+    try {
+        const { name, type, description, eta, quote } = req.body;
+        if (!name) return res.status(400).json({ error: 'System name required.' });
+        const quote_cents = quote ? Math.round(parseFloat(quote) * 100) : null;
+        const deposit_cents = 5000;
+
+        let deposit_url = null, balance_url = null;
+        if (quote_cents) {
+            const { data: profile } = await supabase.from('profiles').select('email').eq('id', req.params.id).single();
+            ({ deposit_url, balance_url } = await buildSystemLinks(name, quote_cents, deposit_cents, profile?.email));
+        }
+
+        const { error } = await supabase.from('systems').insert({
+            client_id: req.params.id, name, type: type || null, description: description || '',
+            eta: eta || null, status: 'waiting_deposit',
+            quote_cents, deposit_cents, deposit_url, balance_url,
+        });
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Update a system: status / ETA / quote (regenerates links if quote changes) ──
 app.patch('/api/admin/systems/:id', requireAdmin, async (req, res) => {
-    const { error } = await supabase.from('systems').update({ status: req.body.status }).eq('id', req.params.id);
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true });
+    try {
+        const updates = {};
+        if (req.body.status !== undefined) updates.status = req.body.status;
+        if (req.body.eta !== undefined) updates.eta = req.body.eta;
+
+        if (req.body.quote !== undefined && req.body.quote !== '') {
+            const quote_cents = Math.round(parseFloat(req.body.quote) * 100);
+            updates.quote_cents = quote_cents;
+            const { data: sys } = await supabase.from('systems').select('name,client_id,deposit_cents').eq('id', req.params.id).single();
+            if (sys) {
+                const { data: profile } = await supabase.from('profiles').select('email').eq('id', sys.client_id).single();
+                const links = await buildSystemLinks(sys.name, quote_cents, sys.deposit_cents, profile?.email);
+                updates.deposit_url = links.deposit_url;
+                updates.balance_url = links.balance_url;
+            }
+        }
+
+        const { error } = await supabase.from('systems').update(updates).eq('id', req.params.id);
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Create invoice + Stripe one-time payment link ──
