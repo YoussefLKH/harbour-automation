@@ -18,6 +18,8 @@ const isEmailConfigured = () => Boolean(transporter);
 const FROM = () => `"${process.env.EMAIL_FROM_NAME || 'Harbour Automation'}" <${process.env.EMAIL_USER}>`;
 const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const APP = () => process.env.APP_URL || 'http://localhost:3000';
+const money = c => '$' + ((c || 0) / 100).toFixed(2);
+const cta = (href, label, dark) => `<div style="text-align:center;margin:26px 0 0;"><a href="${href}" style="display:inline-block;background:${dark ? '#0a2a43' : 'linear-gradient(135deg,#ff7a59,#f4a261)'};color:#fff;padding:14px 34px;border-radius:100px;font-weight:700;text-decoration:none;font-size:0.95rem;">${label}</a></div>`;
 
 // Shared ocean-themed wrapper
 function shell(inner) {
@@ -149,4 +151,63 @@ async function sendSupportReplyEmail(to, name, message) {
     return true;
 }
 
-module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail };
+// ── Admin: deposit paid → start building ──
+async function sendDepositPaidEmail(to, profile, sys) {
+    if (!transporter) return false;
+    const who = esc(profile?.full_name || profile?.email || 'A client');
+    const inner = `<tr><td style="padding:40px;">
+        <p style="color:#0f766e;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 10px;">Deposit paid 💰</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.5rem;margin:0 0 14px;">Time to start building</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 16px;"><b>${who}</b> just paid the ${money(sys.deposit_cents || 5000)} deposit for <b>${esc(sys.name)}</b> (quoted ${money(sys.quote_cents)}). The system is now <b>In Progress</b> — you're clear to begin.</p>
+        ${cta(APP() + '/admin.html', 'Open dashboard →', true)}
+      </td></tr>`;
+    await transporter.sendMail({ from: FROM(), to, subject: `💰 Deposit paid — start building ${sys.name}`, html: shell(inner), text: `${who} paid the deposit for ${sys.name}. It's now In Progress.` });
+    return true;
+}
+
+// ── Admin: balance paid → ready to ship ──
+async function sendBalancePaidEmail(to, profile, sys) {
+    if (!transporter) return false;
+    const who = esc(profile?.full_name || profile?.email || 'A client');
+    const bal = Math.max((sys.quote_cents || 0) - (sys.deposit_cents || 5000), 0);
+    const inner = `<tr><td style="padding:40px;">
+        <p style="color:#0f766e;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 10px;">Balance paid 💰</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.5rem;margin:0 0 14px;">Ready to ship</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 16px;"><b>${who}</b> paid the ${money(bal)} balance for <b>${esc(sys.name)}</b>. You're fully paid — hit <b>Ship</b> when it's delivered.</p>
+        ${cta(APP() + '/admin.html', 'Open dashboard →', true)}
+      </td></tr>`;
+    await transporter.sendMail({ from: FROM(), to, subject: `💰 Balance paid — ready to ship ${sys.name}`, html: shell(inner), text: `${who} paid the balance for ${sys.name}. Ready to ship.` });
+    return true;
+}
+
+// ── Client: final payment requested ──
+async function sendFinalPaymentRequestEmail(to, clientName, sys, balanceCents) {
+    if (!transporter) return false;
+    const first = esc((clientName || 'there').split(' ')[0]);
+    const inner = `<tr><td style="padding:40px;">
+        <p style="color:#0e7490;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 10px;">Your system is ready</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.6rem;margin:0 0 14px;">${esc(sys.name)} is built, ${first} 🎉</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 6px;">It's finished and ready to go live. To receive it, just settle the remaining balance:</p>
+        <p style="color:#0a2a43;font-family:Georgia,serif;font-size:1.8rem;margin:8px 0 0;">${money(balanceCents)}</p>
+        ${sys.balance_url ? cta(sys.balance_url, 'Pay balance & receive it →') : cta(APP() + '/dashboard.html', 'Open dashboard →')}
+        <p style="color:#6f8a9c;font-size:0.82rem;margin:22px 0 0;">You can also pay anytime from your dashboard.</p>
+      </td></tr>`;
+    await transporter.sendMail({ from: FROM(), to, subject: `Your ${sys.name} is ready — final payment`, html: shell(inner), text: `${first}, ${sys.name} is built. Pay the balance of ${money(balanceCents)} to receive it: ${sys.balance_url || APP() + '/dashboard.html'}` });
+    return true;
+}
+
+// ── Client: shipped / live ──
+async function sendShippedEmail(to, clientName, sys) {
+    if (!transporter) return false;
+    const first = esc((clientName || 'there').split(' ')[0]);
+    const inner = `<tr><td style="padding:40px;">
+        <p style="color:#0f766e;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 10px;">It's live 🎉</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.6rem;margin:0 0 14px;">${esc(sys.name)} is now active, ${first}!</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 16px;">Your system is delivered and running. Track its performance anytime from your dashboard — and reach out in Support if you need anything.</p>
+        ${cta(APP() + '/dashboard.html', 'View my dashboard →', true)}
+      </td></tr>`;
+    await transporter.sendMail({ from: FROM(), to, subject: `🎉 ${sys.name} is now live`, html: shell(inner), text: `${first}, ${sys.name} is now active and running. View it: ${APP()}/dashboard.html` });
+    return true;
+}
+
+module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail };

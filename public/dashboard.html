@@ -51,6 +51,7 @@
         .badge.active { background: rgba(20,184,166,0.12); color: #0f766e; }
         .badge.in_progress { background: rgba(59,130,200,0.12); color: #1d4ed8; }
         .badge.waiting_deposit { background: rgba(244,162,97,0.16); color: #b45309; }
+        .badge.payment_due { background: rgba(255,122,89,0.16); color: var(--coral-2); }
         .sys-name { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--ink); margin-bottom: 4px; }
         .sys-desc { font-size: 0.9rem; color: var(--slate); }
         .sys-eta { font-size: 0.84rem; color: var(--muted); margin-top: 10px; }
@@ -214,6 +215,27 @@ async function api(path, opts = {}) {
 const money = c => '$' + ((c || 0) / 100).toFixed(2);
 const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
+// ── Stripe payment success redirect (confirm before rendering so status is fresh) ──
+{
+    const params = new URLSearchParams(location.search);
+    const paid = params.get('paid'), sid = params.get('sid');
+    if (paid && sid) {
+        let ok = false;
+        try { const r = await api('/api/payment/confirm', { method: 'POST', body: JSON.stringify({ sid }) }); ok = r?.ok; } catch {}
+        history.replaceState({}, '', '/dashboard.html');
+        if (ok) {
+            const b = document.createElement('div');
+            b.style.cssText = 'background:var(--grad-ocean);color:#fff;padding:15px 22px;border-radius:12px;margin-bottom:22px;font-weight:600;box-shadow:var(--shadow);';
+            b.textContent = paid === 'deposit'
+                ? '✓ Deposit received — we\'re starting your build! 🌊'
+                : '✓ Payment received — thank you! We\'ll deliver shortly.';
+            const main = document.querySelector('.main');
+            main.insertBefore(b, main.firstChild);
+            setTimeout(() => b.remove(), 9000);
+        }
+    }
+}
+
 // ── Profile ──
 const me = await api('/api/me');
 document.getElementById('greet').textContent = (me.full_name || 'there').split(' ')[0];
@@ -262,7 +284,7 @@ const statHTML = [
 document.getElementById('stat-cards').innerHTML = statHTML;
 
 // ── Systems (shared render) ──
-const STAGE_LABEL = { waiting_deposit: 'Waiting for Deposit', in_progress: 'In Progress', active: 'Active' };
+const STAGE_LABEL = { waiting_deposit: 'Waiting for Deposit', in_progress: 'In Progress', payment_due: 'Payment Due', active: 'Active' };
 const stageLabel = s => STAGE_LABEL[s] || s;
 
 function renderSystems(list, el) {
@@ -278,16 +300,19 @@ renderSystems(sysData.systems, document.getElementById('overview-systems'));
 document.getElementById('systems-list').innerHTML = sysData.systems.map(s => {
     const dep = Math.min(s.deposit_cents || 5000, s.quote_cents || 0);
     const bal = Math.max((s.quote_cents || 0) - (s.deposit_cents || 5000), 0);
-    let pay = '';
+    let pay = '', extra = '', badge = stageLabel(s.status);
     if (s.status === 'waiting_deposit' && s.deposit_url) pay = `<a class="pay-btn" href="${s.deposit_url}">Pay ${money(dep)} deposit to start →</a>`;
-    else if (s.status === 'in_progress' && s.balance_url) pay = `<a class="pay-btn" href="${s.balance_url}">Pay ${money(bal)} balance →</a>`;
+    else if (s.status === 'payment_due' && !s.balance_paid && s.balance_url) pay = `<a class="pay-btn" href="${s.balance_url}">Your system is ready — pay ${money(bal)} balance →</a>`;
+    else if (s.status === 'payment_due' && s.balance_paid) { badge = 'Preparing Delivery'; extra = `<div class="sys-eta" style="color:#0f766e;">✓ Payment received — we're preparing your delivery.</div>`; }
+    else if (s.status === 'active') extra = `<div class="sys-eta" style="color:#0f766e;">✓ Live and running.</div>`;
     return `<div class="card">
         <div class="card-row">
             <div><div class="sys-name">${esc(s.name)}</div><div class="sys-desc">${esc(s.description||'')}</div></div>
-            <span class="badge ${s.status}">${stageLabel(s.status)}</span>
+            <span class="badge ${s.status}">${badge}</span>
         </div>
-        ${s.eta && s.status !== 'active' ? `<div class="sys-eta">Estimated completion: <b>${esc(s.eta)}</b></div>` : ''}
-        ${s.quote_cents ? `<div class="sys-amounts">Total ${money(s.quote_cents)} &nbsp;·&nbsp; Deposit ${money(dep)} to start &nbsp;·&nbsp; Balance ${money(bal)} on delivery</div>` : ''}
+        ${s.eta && (s.status === 'in_progress' || s.status === 'waiting_deposit') ? `<div class="sys-eta">Estimated completion: <b>${esc(s.eta)}</b></div>` : ''}
+        ${extra}
+        ${s.quote_cents ? `<div class="sys-amounts">Total ${money(s.quote_cents)} &nbsp;·&nbsp; Deposit ${money(dep)} &nbsp;·&nbsp; Balance ${money(bal)}</div>` : ''}
         ${pay}
     </div>`;
 }).join('') || '<div class="muted-empty">No systems yet.</div>';

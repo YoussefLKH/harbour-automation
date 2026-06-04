@@ -456,29 +456,31 @@ app.get('/api/admin/clients/:id', requireAdmin, async (req, res) => {
     res.json({ profile, systems: systems || [], invoices: invoices || [], thread: thread || null, messages });
 });
 
-// Helper: create a one-time Stripe Checkout link (CAD)
-async function createCheckout(productName, cents, email) {
+// Helper: create a one-time Stripe Checkout link (CAD). meta = { system_id, kind }
+async function createCheckout(productName, cents, email, meta = {}) {
     if (!stripe || !cents || cents < 50) return null;
+    const kind = meta.kind || '';
     const session = await stripe.checkout.sessions.create({
         mode: 'payment',
         customer_email: email || undefined,
         line_items: [{ price_data: { currency: 'cad', product_data: { name: productName }, unit_amount: cents }, quantity: 1 }],
-        success_url: `${process.env.APP_URL || ''}/dashboard.html?paid=1`,
+        success_url: `${process.env.APP_URL || ''}/dashboard.html?paid=${kind}&sid={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.APP_URL || ''}/dashboard.html`,
+        metadata: { system_id: meta.system_id || '', kind },
     });
     return session.url;
 }
 
 // Build deposit ($50) + balance (quote − deposit) payment links for a system
-async function buildSystemLinks(name, quote_cents, deposit_cents, email) {
+async function buildSystemLinks(name, quote_cents, deposit_cents, email, system_id) {
     const dep = Math.min(deposit_cents || 5000, quote_cents);
     const bal = Math.max(quote_cents - (deposit_cents || 5000), 0);
-    const deposit_url = await createCheckout(`Deposit — ${name}`, dep, email);
-    const balance_url = bal > 0 ? await createCheckout(`Balance — ${name}`, bal, email) : null;
+    const deposit_url = await createCheckout(`Deposit — ${name}`, dep, email, { system_id, kind: 'deposit' });
+    const balance_url = bal > 0 ? await createCheckout(`Balance — ${name}`, bal, email, { system_id, kind: 'balance' }) : null;
     return { deposit_url, balance_url };
 }
 
-// ── Add a system to a client (with quote, ETA, deposit/balance links) ──
+// ── Add a system to a client (insert first, then attach deposit/balance links) ──
 app.post('/api/admin/clients/:id/systems', requireAdmin, async (req, res) => {
     try {
         const { name, type, description, eta, quote } = req.body;
@@ -486,18 +488,17 @@ app.post('/api/admin/clients/:id/systems', requireAdmin, async (req, res) => {
         const quote_cents = quote ? Math.round(parseFloat(quote) * 100) : null;
         const deposit_cents = 5000;
 
-        let deposit_url = null, balance_url = null;
+        const { data: sys, error: insErr } = await supabase.from('systems').insert({
+            client_id: req.params.id, name, type: type || null, description: description || '',
+            eta: eta || null, status: 'waiting_deposit', quote_cents, deposit_cents,
+        }).select().single();
+        if (insErr) return res.status(500).json({ error: insErr.message });
+
         if (quote_cents) {
             const { data: profile } = await supabase.from('profiles').select('email').eq('id', req.params.id).single();
-            ({ deposit_url, balance_url } = await buildSystemLinks(name, quote_cents, deposit_cents, profile?.email));
+            const links = await buildSystemLinks(name, quote_cents, deposit_cents, profile?.email, sys.id);
+            await supabase.from('systems').update(links).eq('id', sys.id);
         }
-
-        const { error } = await supabase.from('systems').insert({
-            client_id: req.params.id, name, type: type || null, description: description || '',
-            eta: eta || null, status: 'waiting_deposit',
-            quote_cents, deposit_cents, deposit_url, balance_url,
-        });
-        if (error) return res.status(500).json({ error: error.message });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -515,7 +516,7 @@ app.patch('/api/admin/systems/:id', requireAdmin, async (req, res) => {
             const { data: sys } = await supabase.from('systems').select('name,client_id,deposit_cents').eq('id', req.params.id).single();
             if (sys) {
                 const { data: profile } = await supabase.from('profiles').select('email').eq('id', sys.client_id).single();
-                const links = await buildSystemLinks(sys.name, quote_cents, sys.deposit_cents, profile?.email);
+                const links = await buildSystemLinks(sys.name, quote_cents, sys.deposit_cents, profile?.email, req.params.id);
                 updates.deposit_url = links.deposit_url;
                 updates.balance_url = links.balance_url;
             }
@@ -524,6 +525,64 @@ app.patch('/api/admin/systems/:id', requireAdmin, async (req, res) => {
         const { error } = await supabase.from('systems').update(updates).eq('id', req.params.id);
         if (error) return res.status(500).json({ error: error.message });
         res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Admin: request final payment (In Progress → Payment Due) + email the client ──
+app.post('/api/admin/systems/:id/request-payment', requireAdmin, async (req, res) => {
+    try {
+        const { data: sys } = await supabase.from('systems').select('*').eq('id', req.params.id).single();
+        if (!sys) return res.status(404).json({ error: 'System not found.' });
+        await supabase.from('systems').update({ status: 'payment_due' }).eq('id', req.params.id);
+        const { data: profile } = await supabase.from('profiles').select('full_name,email').eq('id', sys.client_id).single();
+        if (profile?.email) {
+            const bal = Math.max((sys.quote_cents || 0) - (sys.deposit_cents || 5000), 0);
+            mailer.sendFinalPaymentRequestEmail(profile.email, profile.full_name, sys, bal).catch(e => console.error('Final-payment email failed:', e.message));
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Admin: ship/deliver (→ Active) + email the client ──
+app.post('/api/admin/systems/:id/ship', requireAdmin, async (req, res) => {
+    try {
+        const { data: sys } = await supabase.from('systems').select('*').eq('id', req.params.id).single();
+        if (!sys) return res.status(404).json({ error: 'System not found.' });
+        await supabase.from('systems').update({ status: 'active' }).eq('id', req.params.id);
+        const { data: profile } = await supabase.from('profiles').select('full_name,email').eq('id', sys.client_id).single();
+        if (profile?.email) mailer.sendShippedEmail(profile.email, profile.full_name, sys).catch(e => console.error('Shipped email failed:', e.message));
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Client: confirm a Stripe payment (called from the success redirect) ──
+app.post('/api/payment/confirm', authClient, async (req, res) => {
+    try {
+        if (!stripe) return res.status(503).json({ error: 'Stripe not configured.' });
+        const { sid } = req.body;
+        if (!sid) return res.status(400).json({ error: 'Missing session id.' });
+
+        const session = await stripe.checkout.sessions.retrieve(sid);
+        if (session.payment_status !== 'paid') return res.json({ ok: false });
+
+        const systemId = session.metadata?.system_id;
+        const kind = session.metadata?.kind;
+        if (!systemId) return res.json({ ok: false });
+
+        const { data: sys } = await supabase.from('systems').select('*').eq('id', systemId).single();
+        if (!sys || sys.client_id !== req.user.id) return res.status(403).json({ error: 'Not your system.' });
+
+        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        const { data: profile } = await supabase.from('profiles').select('full_name,business_name,email').eq('id', sys.client_id).single();
+
+        if (kind === 'deposit' && !sys.deposit_paid) {
+            await supabase.from('systems').update({ deposit_paid: true, status: 'in_progress' }).eq('id', systemId);
+            if (adminEmail) mailer.sendDepositPaidEmail(adminEmail, profile, sys).catch(e => console.error('Deposit-paid email failed:', e.message));
+        } else if (kind === 'balance' && !sys.balance_paid) {
+            await supabase.from('systems').update({ balance_paid: true }).eq('id', systemId);
+            if (adminEmail) mailer.sendBalancePaidEmail(adminEmail, profile, sys).catch(e => console.error('Balance-paid email failed:', e.message));
+        }
+        res.json({ ok: true, kind });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
