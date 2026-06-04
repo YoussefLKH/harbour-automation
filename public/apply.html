@@ -10,8 +10,9 @@
     <link rel="stylesheet" href="css/style.css" />
     <style>
         body { background: var(--cream); background-image: radial-gradient(rgba(10,42,67,0.05) 1px, transparent 1px); background-size: 28px 28px; min-height: 100vh; }
-        .apply-nav { padding: 20px 0; }
-        .apply-shell { max-width: 720px; margin: 0 auto; padding: 20px 24px 80px; }
+        /* keep the bar in normal flow so it never overlaps the progress header */
+        .apply-nav { position: static; padding: 18px 0; background: transparent; box-shadow: none; }
+        .apply-shell { max-width: 720px; margin: 0 auto; padding: 12px 24px 80px; }
 
         /* progress */
         .progress { height: 6px; background: rgba(10,42,67,0.08); border-radius: 100px; overflow: hidden; margin-bottom: 14px; }
@@ -63,6 +64,10 @@
         .icon-btn:hover { transform: translateY(-2px); } .icon-btn:disabled { opacity: 0.45; cursor: default; transform: none; }
         .chat-continue { margin-top: 16px; text-align: center; }
         .chat-done { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; padding: 12px; border-radius: var(--radius); background: rgba(20,184,166,0.08); color: var(--ocean); font-size: 0.84rem; font-weight: 600; }
+        /* quick-reply multiple-choice options */
+        .chat-options { display: flex; flex-wrap: wrap; gap: 8px; align-self: flex-start; max-width: 92%; margin-top: -4px; animation: fade 0.3s ease; }
+        .opt-btn { background: #fff; border: 1.5px solid var(--ocean); color: var(--ocean); padding: 9px 16px; border-radius: 100px; font-size: 0.86rem; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.15s; }
+        .opt-btn:hover { background: var(--ocean); color: #fff; transform: translateY(-1px); }
 
         /* plan */
         .plan-head { text-align: center; margin-bottom: 26px; }
@@ -310,23 +315,41 @@ async function callChat() {
     return (await res.json()).reply;
 }
 
-// Reveal a Claude reply with a natural typing delay; handles the [[READY]] wrap-up signal
+// Reveal a Claude reply with a natural typing delay; handles [[READY]] + [[OPTIONS]]
 async function revealReply(promise, fallback) {
     showTyping();
     let reply;
     try {
-        // run the request and a min "typing" delay together so it feels human
-        const [r] = await Promise.all([promise, sleep(900 + Math.random() * 700)]);
+        // longer "thinking" pause so it feels like a real person considering your answer
+        const [r] = await Promise.all([promise, sleep(1400 + Math.random() * 1100)]);
         reply = r;
     } catch { reply = fallback; }
     hideTyping();
 
     const isReady = /\[\[READY\]\]/.test(reply) || /\bPERFECT!/.test(reply);
-    const clean = reply.replace(/\[\[READY\]\]/g, '').trim();
+    // Parse optional quick-reply choices: [[OPTIONS: A | B | C]]
+    const optMatch = reply.match(/\[\[OPTIONS:(.+?)\]\]/s);
+    const options = optMatch ? optMatch[1].split('|').map(s => s.trim()).filter(Boolean) : [];
+
+    const clean = reply.replace(/\[\[READY\]\]/g, '').replace(/\[\[OPTIONS:.*?\]\]/gs, '').trim();
     addBubble('assistant', clean);
     messages.push({ role: 'assistant', content: clean });
+    if (options.length && !isReady) renderOptions(options);
     if (isReady) finishInterview();
     return isReady;
+}
+
+// Render tappable quick-reply buttons under the AI message
+function renderOptions(options) {
+    const wrap = document.createElement('div');
+    wrap.className = 'chat-options';
+    options.forEach(o => {
+        const b = document.createElement('button');
+        b.className = 'opt-btn'; b.type = 'button'; b.textContent = o;
+        b.onclick = () => sendChat(o);
+        wrap.appendChild(b);
+    });
+    log().appendChild(wrap); log().scrollTop = log().scrollHeight;
 }
 
 async function kickoff() {
@@ -336,11 +359,13 @@ async function kickoff() {
 function chatKey(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); } }
 function autosize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,130)+'px'; }
 
-async function sendChat() {
+async function sendChat(forcedText) {
     const input = document.getElementById('chatInput');
-    const text = input.value.trim();
+    const text = (forcedText !== undefined ? forcedText : input.value).trim();
     if (!text) return;
-    input.value=''; input.style.height='auto';
+    if (forcedText === undefined) { input.value=''; input.style.height='auto'; }
+    // clear any open quick-reply buttons once an answer is given
+    document.querySelectorAll('.chat-options').forEach(el => el.remove());
     document.getElementById('sendBtn').disabled = true;
     addBubble('user', text);
     messages.push({ role:'user', content: text });
@@ -414,6 +439,19 @@ async function loadCalendly() {
     s.src = 'https://assets.calendly.com/assets/external/widget.js'; s.async = true;
     document.body.appendChild(s);
 }
+
+// Notify the team the moment a discovery call is actually booked
+let _bookingNotified = false;
+window.addEventListener('message', (e) => {
+    if (_bookingNotified) return;
+    if (e.data && e.data.event === 'calendly.event_scheduled') {
+        _bookingNotified = true;
+        fetch('/api/apply/booked', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...business })
+        }).catch(() => {});
+    }
+});
 </script>
 </body>
 </html>

@@ -22,6 +22,12 @@
         .err { color: var(--coral-2); font-size: 0.86rem; margin-top: 14px; text-align: center; min-height: 1em; }
         .foot { text-align: center; margin-top: 22px; font-size: 0.88rem; color: var(--muted); }
         .foot a { color: var(--ocean); font-weight: 600; }
+        .checks { list-style: none; margin: 12px 0 16px; padding: 0; display: grid; gap: 7px; }
+        .checks li { display: flex; align-items: center; gap: 9px; font-size: 0.82rem; color: var(--muted); transition: color 0.15s; }
+        .checks li .sym { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 0.66rem; font-weight: 700; background: rgba(255,106,69,0.12); color: var(--coral-2); flex-shrink: 0; transition: all 0.15s; }
+        .checks li.ok { color: var(--ink); }
+        .checks li.ok .sym { background: rgba(20,184,166,0.16); color: #0f766e; }
+        .match { font-size: 0.82rem; margin: -4px 0 16px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -47,8 +53,16 @@
         <h1>Welcome aboard 🌊</h1>
         <p class="sub">Set a password to activate your account.</p>
         <div class="field"><label>Your name</label><input id="i_name" placeholder="Jane Smith" /></div>
-        <div class="field"><label>Create a password</label><input id="i_pass" type="password" placeholder="At least 8 characters" /></div>
-        <button class="btn btn-primary btn-full" id="redeemBtn" onclick="window._redeem()">Activate account →</button>
+        <div class="field"><label>Create a password</label><input id="i_pass" type="password" placeholder="Create a password" oninput="checkPass()" /></div>
+        <ul class="checks" id="checks">
+            <li data-rule="len"><span class="sym">✕</span> At least 8 characters</li>
+            <li data-rule="upper"><span class="sym">✕</span> One uppercase letter</li>
+            <li data-rule="num"><span class="sym">✕</span> One number</li>
+            <li data-rule="special"><span class="sym">✕</span> One special character</li>
+        </ul>
+        <div class="field"><label>Confirm password</label><input id="i_pass2" type="password" placeholder="Re-enter your password" oninput="checkPass()" /></div>
+        <div class="match" id="matchMsg" style="display:none;"></div>
+        <button class="btn btn-primary btn-full" id="redeemBtn" onclick="window._redeem()" disabled>Activate account →</button>
         <div class="err" id="ierr"></div>
     </div>
 </div>
@@ -88,12 +102,38 @@ window._login = async function () {
     routeAfterAuth(data.session);
 };
 
+const PW_RULES = { len: p => p.length >= 8, upper: p => /[A-Z]/.test(p), num: p => /[0-9]/.test(p), special: p => /[^A-Za-z0-9]/.test(p) };
+window.checkPass = function () {
+    const p = document.getElementById('i_pass').value;
+    const p2 = document.getElementById('i_pass2').value;
+    let allOk = true;
+    document.querySelectorAll('#checks li').forEach(li => {
+        const ok = PW_RULES[li.dataset.rule](p);
+        li.classList.toggle('ok', ok);
+        li.querySelector('.sym').textContent = ok ? '✓' : '✕';
+        if (!ok) allOk = false;
+    });
+    const matchEl = document.getElementById('matchMsg');
+    let match = false;
+    if (p2.length === 0) { matchEl.style.display = 'none'; }
+    else {
+        match = p === p2;
+        matchEl.style.display = 'block';
+        matchEl.textContent = match ? '✓ Passwords match' : '✕ Passwords don\'t match';
+        matchEl.style.color = match ? '#0f766e' : 'var(--coral-2)';
+    }
+    document.getElementById('redeemBtn').disabled = !(allOk && match);
+};
+
 window._redeem = async function () {
     const full_name = document.getElementById('i_name').value.trim();
     const password = document.getElementById('i_pass').value;
+    const password2 = document.getElementById('i_pass2').value;
     const btn = document.getElementById('redeemBtn'); const err = document.getElementById('ierr');
     err.textContent = '';
-    if (password.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+    const strong = Object.values(PW_RULES).every(fn => fn(password));
+    if (!strong) { err.textContent = 'Please meet all password requirements.'; return; }
+    if (password !== password2) { err.textContent = 'Passwords don\'t match.'; return; }
     btn.disabled = true; btn.textContent = 'Activating…';
     const r = await fetch('/api/invite/redeem', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -85,6 +85,14 @@ RULES:
 - Do NOT pitch packages or quote prices. This is discovery, not a sale.
 - Never invent facts about their business — ask instead.
 
+QUICK-REPLY OPTIONS (use these often — they make it effortless for the owner):
+- Whenever your question naturally implies a choice — anything you'd phrase as "X or Y", a yes/no, a range, or picking from a few categories — you MUST add 2-4 tappable options.
+- Put them on their OWN LAST line in EXACTLY this format: [[OPTIONS: First choice | Second choice | Third choice]]
+- Example — if you ask "When you miss a call, does it go to voicemail or do they just hang up?", end your message with:
+  [[OPTIONS: Goes to voicemail | They hang up | A bit of both]]
+- Only skip options for genuinely open-ended prompts ("walk me through a typical day").
+- The [[OPTIONS:...]] tag is machine-read and hidden from the user — never mention it or repeat the choices inside your sentence.
+
 WRAPPING UP (important — to respect their time and our costs):
 - You only need: their industry/business, their top 1-3 time-or-money drains, and a rough sense of scale. This usually takes just 3-4 of their answers.
 - As SOON as you have that, STOP asking questions. Do not drag the conversation on.
@@ -220,10 +228,26 @@ app.post('/api/apply/submit', async (req, res) => {
             fs.writeFileSync(file, JSON.stringify(existing, null, 2));
         }
 
+        // Notify the team of the new application (non-blocking)
+        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        if (adminEmail) mailer.sendNewApplicationEmail(adminEmail, record).catch(e => console.error('New-application email failed:', e.message));
+
         res.json({ success: true });
     } catch (e) {
         console.error('apply/submit error:', e.message);
         res.status(500).json({ error: 'Could not save application.' });
+    }
+});
+
+// ── Applicant booked a discovery call (fired from the Calendly embed) ──
+app.post('/api/apply/booked', async (req, res) => {
+    try {
+        const a = req.body || {};
+        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        if (adminEmail) mailer.sendCallBookedEmail(adminEmail, a).catch(e => console.error('Call-booked email failed:', e.message));
+        res.json({ success: true });
+    } catch (e) {
+        res.json({ success: false });
     }
 });
 

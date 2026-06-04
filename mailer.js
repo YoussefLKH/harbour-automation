@@ -16,6 +16,8 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
 
 const isEmailConfigured = () => Boolean(transporter);
 const FROM = () => `"${process.env.EMAIL_FROM_NAME || 'Harbour Automation'}" <${process.env.EMAIL_USER}>`;
+const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const APP = () => process.env.APP_URL || 'http://localhost:3000';
 
 // Shared ocean-themed wrapper
 function shell(inner) {
@@ -35,20 +37,96 @@ function shell(inner) {
 
 async function sendActivationEmail(to, name, link) {
     if (!transporter) return false;
-    const first = (name || 'there').split(' ')[0];
-    const inner = `<tr><td style="padding:40px;">
-        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.6rem;margin:0 0 14px;">Welcome aboard, ${first}! 🌊</h1>
-        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 14px;">We're thrilled to have you. Your Harbour Automation client account is ready — just set your password to activate it and access your dashboard.</p>
-        <div style="text-align:center;margin:30px 0;">
-          <a href="${link}" style="display:inline-block;background:linear-gradient(135deg,#ff7a59,#f4a261);color:#fff;padding:15px 38px;border-radius:100px;font-weight:700;font-size:1rem;text-decoration:none;">Activate my account →</a>
+    const first = esc((name || 'there').split(' ')[0]);
+    const inner = `<tr><td style="padding:44px 40px;">
+        <p style="color:#0e7490;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 12px;">Application approved</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.7rem;line-height:1.25;margin:0 0 16px;">Welcome aboard, ${first}.</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 22px;">We're excited to start building with you. Your client account is ready — set a password below to activate it and open your dashboard, where you'll track your systems, reports, billing, and chat with our team.</p>
+
+        <div style="text-align:center;margin:8px 0 26px;">
+          <a href="${link}" style="display:inline-block;background:linear-gradient(135deg,#ff7a59,#f4a261);color:#fff;padding:16px 40px;border-radius:100px;font-weight:700;font-size:1rem;text-decoration:none;">Activate my account &rarr;</a>
         </div>
-        <p style="color:#6f8a9c;font-size:0.85rem;line-height:1.6;margin:0;">Or paste this link into your browser:<br><span style="color:#0e7490;word-break:break-all;">${link}</span></p>
-        <p style="color:#6f8a9c;font-size:0.82rem;margin:22px 0 0;">This link expires in 14 days. If you weren't expecting this, you can ignore it.</p>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f6f6;border-radius:14px;margin:0 0 22px;"><tr><td style="padding:18px 22px;">
+          <p style="color:#0a2a43;font-size:0.82rem;font-weight:700;margin:0 0 10px;">What happens next</p>
+          <p style="color:#37576b;font-size:0.9rem;line-height:1.7;margin:0;">1. Set your password &amp; log in<br>2. We get to work building your systems<br>3. Track everything live from your dashboard</p>
+        </td></tr></table>
+
+        <p style="color:#6f8a9c;font-size:0.82rem;line-height:1.6;margin:0;">Button not working? Paste this link into your browser:<br><span style="color:#0e7490;word-break:break-all;">${esc(link)}</span></p>
+        <p style="color:#9fb2bd;font-size:0.78rem;margin:20px 0 0;">This secure link expires in 14 days. If you weren't expecting it, you can safely ignore this email.</p>
       </td></tr>`;
     await transporter.sendMail({
-        from: FROM(), to, subject: 'Activate your Harbour Automation account 🌊',
+        from: FROM(), to, subject: `${first}, your Harbour Automation account is ready`,
         html: shell(inner),
-        text: `Welcome aboard, ${first}! Set your password to activate your account: ${link}`,
+        text: `Welcome aboard, ${first}! Your application was approved. Set your password to activate your account: ${link} (expires in 14 days).`,
+    });
+    return true;
+}
+
+// ── Admin: new application received ──
+async function sendNewApplicationEmail(to, app) {
+    if (!transporter) return false;
+    const plan = app.plan || {};
+    const recs = (plan.recommendations || []).map((r, i) =>
+        `<tr><td style="padding:8px 0;border-bottom:1px solid #eef3f3;">
+           <span style="color:#0a2a43;font-weight:700;font-size:0.92rem;">${i + 1}. ${esc(r.title)}</span>
+           <span style="color:#37576b;font-size:0.9rem;"> — ${esc(r.desc)}</span>
+           ${r.impact ? `<br><span style="color:#0e7490;font-size:0.82rem;font-weight:600;">${esc(r.impact)}</span>` : ''}
+         </td></tr>`).join('');
+
+    const row = (k, v) => `<tr><td style="padding:7px 0;color:#6f8a9c;font-size:0.85rem;width:120px;">${k}</td><td style="padding:7px 0;color:#0a2a43;font-size:0.92rem;font-weight:600;">${esc(v) || '—'}</td></tr>`;
+
+    const inner = `<tr><td style="padding:40px;">
+        <p style="color:#0e7490;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 10px;">New application</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.55rem;margin:0 0 20px;">${esc(app.full_name)} just applied</h1>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+          ${row('Business', app.business_name)}
+          ${row('Email', app.email)}
+          ${row('Phone', app.phone)}
+          ${row('Industry', app.industry)}
+          ${row('Team size', app.team_size)}
+        </table>
+
+        ${plan.headline ? `
+        <p style="color:#0a2a43;font-size:0.82rem;font-weight:700;margin:0 0 6px;">AI-recommended plan</p>
+        <p style="color:#0a2a43;font-family:Georgia,serif;font-size:1.05rem;margin:0 0 6px;">${esc(plan.headline)}</p>
+        <p style="color:#37576b;font-size:0.9rem;line-height:1.6;margin:0 0 12px;">${esc(plan.summary)}</p>
+        <table width="100%" cellpadding="0" cellspacing="0">${recs}</table>` : ''}
+
+        <div style="text-align:center;margin:28px 0 0;">
+          <a href="${APP()}/admin.html" style="display:inline-block;background:#0a2a43;color:#fff;padding:14px 34px;border-radius:100px;font-weight:700;text-decoration:none;font-size:0.95rem;">Review in dashboard &rarr;</a>
+        </div>
+      </td></tr>`;
+    await transporter.sendMail({
+        from: FROM(), to,
+        subject: `New application — ${app.full_name}${app.business_name ? ' (' + app.business_name + ')' : ''}`,
+        html: shell(inner),
+        text: `New application from ${app.full_name} (${app.business_name}). Email: ${app.email}, Phone: ${app.phone}. Review: ${APP()}/admin.html`,
+    });
+    return true;
+}
+
+// ── Admin: applicant booked a discovery call ──
+async function sendCallBookedEmail(to, app) {
+    if (!transporter) return false;
+    const inner = `<tr><td style="padding:40px;">
+        <p style="color:#14b8a6;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 10px;">Discovery call booked</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.55rem;margin:0 0 14px;">${esc(app.full_name)} booked a call ✅</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 18px;">They completed the application and just scheduled a discovery call. The exact date &amp; time are in the Calendly confirmation Calendly just sent you.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f6f6;border-radius:14px;"><tr><td style="padding:16px 22px;">
+          <p style="margin:0;color:#0a2a43;font-size:0.92rem;"><b>${esc(app.full_name)}</b>${app.business_name ? ' · ' + esc(app.business_name) : ''}<br>
+          <span style="color:#37576b;font-size:0.88rem;">${esc(app.email)} · ${esc(app.phone)}</span></p>
+        </td></tr></table>
+        <div style="text-align:center;margin:26px 0 0;">
+          <a href="${APP()}/admin.html" style="display:inline-block;background:#0a2a43;color:#fff;padding:13px 32px;border-radius:100px;font-weight:700;text-decoration:none;">Open dashboard &rarr;</a>
+        </div>
+      </td></tr>`;
+    await transporter.sendMail({
+        from: FROM(), to,
+        subject: `📅 ${app.full_name} booked a discovery call`,
+        html: shell(inner),
+        text: `${app.full_name} (${app.business_name}) booked a discovery call. Exact time is in your Calendly confirmation. Contact: ${app.email}, ${app.phone}.`,
     });
     return true;
 }
@@ -71,4 +149,4 @@ async function sendSupportReplyEmail(to, name, message) {
     return true;
 }
 
-module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail };
+module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail };
