@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard — Harbour Automation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+        body { background: var(--cream); }
+        .layout { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+
+        /* Sidebar */
+        .side { background: var(--deep); color: #fff; padding: 24px 16px; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+        .side .logo { color: #fff; padding: 0 8px 24px; font-size: 1.2rem; }
+        .side .logo span { color: var(--seafoam); }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: var(--radius); color: rgba(255,255,255,0.65); font-size: 0.92rem; font-weight: 500; cursor: pointer; border: none; background: none; width: 100%; text-align: left; transition: background 0.15s, color 0.15s; font-family: 'Inter', sans-serif; }
+        .nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .nav-item.active { background: rgba(94,234,212,0.14); color: var(--seafoam); }
+        .nav-item svg { width: 19px; height: 19px; flex-shrink: 0; }
+        .side-foot { margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .side-user { padding: 8px 10px; font-size: 0.82rem; color: rgba(255,255,255,0.7); margin-bottom: 6px; }
+        .side-user b { color: #fff; display: block; font-size: 0.9rem; }
+
+        /* Main */
+        .main { padding: 36px 44px; max-width: 1100px; }
+        .page { display: none; animation: fade 0.4s ease; }
+        .page.active { display: block; }
+        @keyframes fade { from{opacity:0;transform:translateY(12px);} to{opacity:1;transform:none;} }
+        .page-title { font-size: 2rem; margin-bottom: 6px; }
+        .page-sub { color: var(--muted); margin-bottom: 30px; }
+
+        /* Stat cards */
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 34px; }
+        .stat { background: #fff; border: 1px solid var(--line-2); border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-sm); }
+        .stat .s-ico { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 14px; }
+        .stat .s-val { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--ink); line-height: 1; }
+        .stat .s-label { font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+
+        /* Generic card */
+        .card { background: #fff; border: 1px solid var(--line-2); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); margin-bottom: 16px; }
+        .card-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+        .badge { font-size: 0.72rem; font-weight: 700; padding: 4px 11px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .badge.live { background: rgba(20,184,166,0.12); color: var(--ocean); }
+        .badge.building { background: rgba(244,162,97,0.16); color: #b45309; }
+        .badge.paused { background: rgba(10,42,67,0.08); color: var(--muted); }
+        .badge.paid { background: rgba(20,184,166,0.12); color: var(--ocean); }
+        .badge.sent { background: rgba(244,162,97,0.16); color: #b45309; }
+        .sys-name { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--ink); margin-bottom: 4px; }
+        .sys-desc { font-size: 0.9rem; color: var(--slate); }
+        .muted-empty { text-align: center; color: var(--muted); padding: 40px; }
+
+        /* Support chat */
+        .chat-card { background: #fff; border: 1px solid var(--line-2); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; height: 560px; overflow: hidden; }
+        .chat-top { padding: 18px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+        .chat-top .ca { width: 42px; height: 42px; border-radius: 50%; background: var(--grad-ocean); display: grid; place-items: center; color: #fff; font-family: 'Fraunces', serif; }
+        .chat-msgs { flex: 1; overflow-y: auto; padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+        .b { padding: 12px 16px; border-radius: 16px; font-size: 0.92rem; line-height: 1.55; max-width: 78%; white-space: pre-wrap; }
+        .b.client { background: var(--grad-ocean); color: #fff; align-self: flex-end; border-bottom-right-radius: 5px; }
+        .b.admin { background: var(--sand); color: var(--slate); align-self: flex-start; border-bottom-left-radius: 5px; }
+        .b-meta { font-size: 0.68rem; color: var(--text-dim, #93a5b1); margin-top: 4px; }
+        .chat-send { padding: 14px 18px; border-top: 1px solid var(--line); display: flex; gap: 10px; }
+        .chat-send textarea { flex: 1; border: 1.5px solid var(--line); border-radius: var(--radius); padding: 12px 14px; resize: none; font-family: 'Inter', sans-serif; font-size: 0.93rem; min-height: 46px; max-height: 120px; }
+        .chat-send textarea:focus { outline: none; border-color: var(--ocean); }
+
+        table.inv { width: 100%; border-collapse: collapse; }
+        table.inv th { text-align: left; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+        table.inv td { padding: 16px 0; border-bottom: 1px solid var(--line-2); font-size: 0.92rem; color: var(--ink); }
+
+        @media (max-width: 820px) {
+            .layout { grid-template-columns: 1fr; }
+            .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; gap: 6px; }
+            .side .logo { width: 100%; padding-bottom: 12px; } .side-foot { width: 100%; margin-top: 12px; }
+            .nav-item { width: auto; } .main { padding: 24px; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <!-- SIDEBAR -->
+    <aside class="side">
+        <a href="/" class="logo">
+            <svg class="logo-mark" viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="11" fill="#0e7490"/><path d="M20 8 L24 15 H16 L20 8Z" fill="#ff7a59"/><rect x="17.5" y="15" width="5" height="12" fill="#5eead4"/><path d="M16 27 H24 L25.5 30 H14.5 L16 27Z" fill="#fff"/><path d="M9 33 q3 -3 6 0 t6 0 t6 0" stroke="#99f6e4" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+            Harbour<span>.</span>
+        </a>
+        <button class="nav-item active" data-page="overview" onclick="nav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> Overview</button>
+        <button class="nav-item" data-page="systems" onclick="nav('systems')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg> My Systems</button>
+        <button class="nav-item" data-page="reports" onclick="nav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg> Reports</button>
+        <button class="nav-item" data-page="support" onclick="nav('support')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Support</button>
+        <button class="nav-item" data-page="billing" onclick="nav('billing')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Billing</button>
+        <div class="side-foot">
+            <div class="side-user"><b id="u-name">…</b><span id="u-biz"></span></div>
+            <button class="nav-item" onclick="signOut()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Sign out</button>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+        <!-- OVERVIEW -->
+        <section class="page active" id="page-overview">
+            <h1 class="page-title">Welcome back, <span id="greet">there</span> 🌊</h1>
+            <p class="page-sub" id="overview-sub">Here's how your systems are performing.</p>
+            <div class="stats" id="stat-cards"></div>
+            <div class="card">
+                <h3 class="sys-name">Your systems</h3>
+                <div id="overview-systems"></div>
+            </div>
+        </section>
+
+        <!-- SYSTEMS -->
+        <section class="page" id="page-systems">
+            <h1 class="page-title">My Systems</h1>
+            <p class="page-sub">The automations we've built and run for you.</p>
+            <div id="systems-list"></div>
+        </section>
+
+        <!-- REPORTS -->
+        <section class="page" id="page-reports">
+            <h1 class="page-title">Reports</h1>
+            <p class="page-sub">Monthly performance of your automations.</p>
+            <div id="reports-list"></div>
+        </section>
+
+        <!-- SUPPORT -->
+        <section class="page" id="page-support">
+            <h1 class="page-title">Support</h1>
+            <p class="page-sub">Message the Harbour team anytime — we're here to help.</p>
+            <div class="chat-card">
+                <div class="chat-top"><div class="ca">H</div><div><div style="font-weight:700;color:var(--ink);">Harbour Team</div><div style="font-size:0.8rem;color:var(--teal);">Typically replies within a few hours</div></div></div>
+                <div class="chat-msgs" id="chat-msgs"></div>
+                <div class="chat-send">
+                    <textarea id="chat-in" rows="1" placeholder="Type a message…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}"></textarea>
+                    <button class="icon-btn" onclick="sendMsg()" style="width:46px;height:46px;border-radius:var(--radius);border:none;background:var(--grad-beacon);color:#fff;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+                </div>
+            </div>
+        </section>
+
+        <!-- BILLING -->
+        <section class="page" id="page-billing">
+            <h1 class="page-title">Billing</h1>
+            <p class="page-sub">Your invoices and payment history.</p>
+            <div class="card"><table class="inv"><thead><tr><th>Description</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody id="inv-body"></tbody></table></div>
+        </section>
+    </main>
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const cfg = await (await fetch('/api/config')).json();
+const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+
+// Auth guard
+const { data: { session } } = await sb.auth.getSession();
+if (!session) location.replace('/login.html');
+
+async function api(path, opts = {}) {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(path, {
+        ...opts,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, ...(opts.headers || {}) },
+    });
+    if (res.status === 401) { location.replace('/login.html'); return; }
+    return res.json();
+}
+
+const money = c => '$' + ((c || 0) / 100).toFixed(2);
+const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// ── Profile ──
+const me = await api('/api/me');
+document.getElementById('greet').textContent = (me.full_name || 'there').split(' ')[0];
+document.getElementById('u-name').textContent = me.full_name || me.email;
+document.getElementById('u-biz').textContent = me.business_name || '';
+
+// ── Overview ──
+const ov = await api('/api/me/overview');
+const statHTML = [
+    { ico:'📞', bg:'rgba(14,116,144,0.1)', val: ov.callsHandled, label: 'Calls handled' + (ov.period ? ' · ' + ov.period : '') },
+    { ico:'⏱️', bg:'rgba(20,184,166,0.1)', val: ov.hoursSaved + ' hrs', label: 'Time saved' },
+    { ico:'🎯', bg:'rgba(255,122,89,0.12)', val: ov.leadsCaptured, label: 'Leads captured' },
+    { ico:'⚙️', bg:'rgba(10,42,67,0.07)', val: ov.systemsLive + '/' + ov.systemsTotal, label: 'Systems live' },
+].map(s => `<div class="stat"><div class="s-ico" style="background:${s.bg};font-size:1.2rem;">${s.ico}</div><div class="s-val">${s.val}</div><div class="s-label">${s.label}</div></div>`).join('');
+document.getElementById('stat-cards').innerHTML = statHTML;
+
+// ── Systems (shared render) ──
+function renderSystems(list, el) {
+    if (!list.length) { el.innerHTML = '<div class="muted-empty">No systems yet — we\'ll add them as we build.</div>'; return; }
+    el.innerHTML = list.map(s => `
+        <div class="card-row" style="padding:14px 0;border-bottom:1px solid var(--line-2);">
+            <div><div class="sys-name" style="font-size:1.05rem;">${esc(s.name)}</div><div class="sys-desc">${esc(s.description||'')}</div></div>
+            <span class="badge ${s.status}">${s.status}</span>
+        </div>`).join('');
+}
+const sysData = await api('/api/me/systems');
+renderSystems(sysData.systems, document.getElementById('overview-systems'));
+document.getElementById('systems-list').innerHTML = sysData.systems.map(s => `
+    <div class="card"><div class="card-row">
+        <div><div class="sys-name">${esc(s.name)}</div><div class="sys-desc">${esc(s.description||'')}</div></div>
+        <span class="badge ${s.status}">${s.status}</span>
+    </div></div>`).join('') || '<div class="muted-empty">No systems yet.</div>';
+
+// ── Reports ──
+const rep = await api('/api/me/reports');
+document.getElementById('reports-list').innerHTML = rep.reports.map(r => `
+    <div class="card">
+        <div class="card-row" style="margin-bottom:14px;"><h3 class="sys-name" style="margin:0;">${r.period}</h3></div>
+        <div class="stats" style="margin-bottom:16px;">
+            <div class="stat"><div class="s-val">${r.calls_handled}</div><div class="s-label">Calls handled</div></div>
+            <div class="stat"><div class="s-val">${r.hours_saved} hrs</div><div class="s-label">Time saved</div></div>
+            <div class="stat"><div class="s-val">${r.leads_captured}</div><div class="s-label">Leads captured</div></div>
+        </div>
+        <p class="sys-desc">${esc(r.summary||'')}</p>
+    </div>`).join('') || '<div class="muted-empty">Your first report will appear after your systems run for a full month.</div>';
+
+// ── Billing ──
+const inv = await api('/api/me/invoices');
+document.getElementById('inv-body').innerHTML = inv.invoices.map(i => `
+    <tr><td>${esc(i.description||'')}</td><td>${money(i.amount_cents)}</td><td>${i.due_date||'—'}</td><td><span class="badge ${i.status}">${i.status}</span></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted-empty">No invoices yet.</td></tr>';
+
+// ── Support chat ──
+let chatLoaded = false, pollTimer = null, msgCount = 0, threadId = null;
+async function loadSupport() {
+    const data = await api('/api/me/support');
+    threadId = data.thread.id;
+    renderMsgs(data.messages);
+    msgCount = data.messages.length;
+}
+function renderMsgs(msgs) {
+    const box = document.getElementById('chat-msgs');
+    if (!msgs.length) { box.innerHTML = '<div class="muted-empty">👋 Say hi — how can we help?</div>'; return; }
+    box.innerHTML = msgs.map(m => `<div><div class="b ${m.sender_role}">${esc(m.body)}</div><div class="b-meta" style="text-align:${m.sender_role==='client'?'right':'left'};">${m.sender_name||''}</div></div>`).join('');
+    box.scrollTop = box.scrollHeight;
+}
+window.sendMsg = async function () {
+    const ta = document.getElementById('chat-in');
+    const text = ta.value.trim(); if (!text) return;
+    ta.value = '';
+    const box = document.getElementById('chat-msgs');
+    if (box.querySelector('.muted-empty')) box.innerHTML = '';
+    box.insertAdjacentHTML('beforeend', `<div><div class="b client">${esc(text)}</div><div class="b-meta" style="text-align:right;">You</div></div>`);
+    box.scrollTop = box.scrollHeight; msgCount++;
+    await api('/api/me/support', { method: 'POST', body: JSON.stringify({ text }) });
+    setTimeout(refreshSupport, 800);
+};
+async function refreshSupport() {
+    if (!threadId) return;
+    const data = await api('/api/me/support');
+    if (data.messages.length !== msgCount) { renderMsgs(data.messages); msgCount = data.messages.length; }
+}
+
+// ── Nav ──
+window.nav = function (page) {
+    document.querySelectorAll('.nav-item[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
+    if (page === 'support') {
+        if (!chatLoaded) { chatLoaded = true; loadSupport(); }
+        clearInterval(pollTimer); pollTimer = setInterval(refreshSupport, 4000);
+    } else { clearInterval(pollTimer); }
+};
+
+window.signOut = async function () { await sb.auth.signOut(); location.replace('/login.html'); };
+</script>
+</body>
+</html>

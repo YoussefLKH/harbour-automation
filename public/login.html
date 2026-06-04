@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Client Login — Harbour Automation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+        body { min-height: 100vh; display: grid; place-items: center; background: var(--grad-ocean); padding: 24px; }
+        .login-card { width: 100%; max-width: 420px; background: #fff; border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 40px; }
+        .login-card .logo { justify-content: center; margin-bottom: 6px; }
+        .login-card h1 { font-size: 1.7rem; text-align: center; margin-bottom: 6px; }
+        .login-card .sub { text-align: center; color: var(--muted); font-size: 0.92rem; margin-bottom: 28px; }
+        .field { margin-bottom: 16px; }
+        .field label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--ink); margin-bottom: 7px; }
+        .field input { width: 100%; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 0.96rem; }
+        .field input:focus { outline: none; border-color: var(--ocean); }
+        .btn-full { width: 100%; margin-top: 6px; }
+        .err { color: var(--coral-2); font-size: 0.86rem; margin-top: 14px; text-align: center; min-height: 1em; }
+        .foot { text-align: center; margin-top: 22px; font-size: 0.88rem; color: var(--muted); }
+        .foot a { color: var(--ocean); font-weight: 600; }
+    </style>
+</head>
+<body>
+<div class="login-card">
+    <a href="/" class="logo">
+        <svg class="logo-mark" viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="11" fill="#0a2a43"/><path d="M20 8 L24 15 H16 L20 8Z" fill="#ff7a59"/><rect x="17.5" y="15" width="5" height="12" fill="#5eead4"/><path d="M16 27 H24 L25.5 30 H14.5 L16 27Z" fill="#fff"/><path d="M9 33 q3 -3 6 0 t6 0 t6 0" stroke="#14b8a6" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+        Harbour<span>.</span>
+    </a>
+
+    <!-- LOGIN -->
+    <div id="loginView">
+        <h1>Welcome back</h1>
+        <p class="sub">Sign in to your client dashboard.</p>
+        <div class="field"><label>Email</label><input id="email" type="email" placeholder="you@business.com" /></div>
+        <div class="field"><label>Password</label><input id="password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')window._login()" /></div>
+        <button class="btn btn-primary btn-full" id="loginBtn" onclick="window._login()">Sign in →</button>
+        <div class="err" id="err"></div>
+        <p class="foot">Not a client yet? <a href="/apply.html">Apply to work with us</a></p>
+    </div>
+
+    <!-- INVITE / SET PASSWORD -->
+    <div id="inviteView" style="display:none;">
+        <h1>Welcome aboard 🌊</h1>
+        <p class="sub">Set a password to activate your account.</p>
+        <div class="field"><label>Your name</label><input id="i_name" placeholder="Jane Smith" /></div>
+        <div class="field"><label>Create a password</label><input id="i_pass" type="password" placeholder="At least 8 characters" /></div>
+        <button class="btn btn-primary btn-full" id="redeemBtn" onclick="window._redeem()">Activate account →</button>
+        <div class="err" id="ierr"></div>
+    </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const cfg = await (await fetch('/api/config')).json();
+const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+window._sb = sb;
+
+// Already signed in? go to dashboard
+const { data: { session } } = await sb.auth.getSession();
+if (session) location.replace('/dashboard.html');
+
+// Invite mode?
+const inviteToken = new URLSearchParams(location.search).get('invite');
+if (inviteToken) {
+    document.getElementById('loginView').style.display = 'none';
+    document.getElementById('inviteView').style.display = 'block';
+}
+
+window._login = async function () {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('loginBtn'); const err = document.getElementById('err');
+    err.textContent = ''; btn.disabled = true; btn.textContent = 'Signing in…';
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) { err.textContent = error.message; btn.disabled = false; btn.textContent = 'Sign in →'; return; }
+    location.replace('/dashboard.html');
+};
+
+window._redeem = async function () {
+    const full_name = document.getElementById('i_name').value.trim();
+    const password = document.getElementById('i_pass').value;
+    const btn = document.getElementById('redeemBtn'); const err = document.getElementById('ierr');
+    err.textContent = '';
+    if (password.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+    btn.disabled = true; btn.textContent = 'Activating…';
+    const r = await fetch('/api/invite/redeem', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: inviteToken, password, full_name }),
+    });
+    const data = await r.json();
+    if (!r.ok) { err.textContent = data.error || 'Could not activate.'; btn.disabled = false; btn.textContent = 'Activate account →'; return; }
+    await sb.auth.signInWithPassword({ email: data.email, password });
+    location.replace('/dashboard.html');
+};
+</script>
+</body>
+</html>

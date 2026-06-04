@@ -41,6 +41,8 @@ app.get('/api/health', (_req, res) => res.json({
 }));
 app.get('/api/config', (_req, res) => res.json({
     calendlyUrl: process.env.CALENDLY_URL || '',
+    supabaseUrl: process.env.SUPABASE_URL || '',
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
 }));
 
 // ════════════════════════════════════════════════════════════
@@ -196,6 +198,144 @@ app.post('/api/apply/submit', async (req, res) => {
         console.error('apply/submit error:', e.message);
         res.status(500).json({ error: 'Could not save application.' });
     }
+});
+
+// ════════════════════════════════════════════════════════════
+// CLIENT AUTH + DASHBOARD
+// Auth: frontend signs in with Supabase, sends the access token;
+// we verify it and use the service role for DB work.
+// ════════════════════════════════════════════════════════════
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+async function authClient(req, res, next) {
+    if (!supabase) return res.status(503).json({ error: 'Database not configured.' });
+    const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
+    if (!token) return res.status(401).json({ error: 'Not signed in.' });
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data?.user) return res.status(401).json({ error: 'Session expired.' });
+    req.user = data.user;
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
+    req.profile = profile || { id: data.user.id, email: data.user.email };
+    req.isAdmin = ADMIN_EMAILS.includes((data.user.email || '').toLowerCase()) || profile?.role === 'admin';
+    next();
+}
+
+// ── Profile ──
+app.get('/api/me', authClient, (req, res) => res.json({ ...req.profile, isAdmin: req.isAdmin }));
+
+// ── Overview (stat cards) ──
+app.get('/api/me/overview', authClient, async (req, res) => {
+    try {
+        const uid = req.user.id;
+        const [{ data: systems }, { data: reports }, { data: invoices }] = await Promise.all([
+            supabase.from('systems').select('status').eq('client_id', uid),
+            supabase.from('reports').select('*').eq('client_id', uid).order('period', { ascending: false }).limit(1),
+            supabase.from('invoices').select('amount_cents,status').eq('client_id', uid),
+        ]);
+        const latest = reports?.[0] || {};
+        const openInv = (invoices || []).filter(i => i.status === 'sent');
+        res.json({
+            systemsLive: (systems || []).filter(s => s.status === 'live').length,
+            systemsTotal: (systems || []).length,
+            hoursSaved: latest.hours_saved || 0,
+            callsHandled: latest.calls_handled || 0,
+            leadsCaptured: latest.leads_captured || 0,
+            period: latest.period || null,
+            openInvoices: openInv.length,
+            openAmount: openInv.reduce((s, i) => s + (i.amount_cents || 0), 0),
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/me/systems', authClient, async (req, res) => {
+    const { data, error } = await supabase.from('systems').select('*').eq('client_id', req.user.id).order('created_at');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ systems: data || [] });
+});
+
+app.get('/api/me/reports', authClient, async (req, res) => {
+    const { data, error } = await supabase.from('reports').select('*').eq('client_id', req.user.id).order('period', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ reports: data || [] });
+});
+
+app.get('/api/me/invoices', authClient, async (req, res) => {
+    const { data, error } = await supabase.from('invoices').select('*').eq('client_id', req.user.id).order('due_date', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ invoices: data || [] });
+});
+
+// ── Support chat ──
+async function getOrCreateThread(uid, profile) {
+    let { data: thread } = await supabase.from('support_threads').select('*').eq('client_id', uid).single();
+    if (!thread) {
+        const { data } = await supabase.from('support_threads')
+            .insert({ client_id: uid, status: 'open' }).select().single();
+        thread = data;
+    }
+    return thread;
+}
+
+app.get('/api/me/support', authClient, async (req, res) => {
+    try {
+        const thread = await getOrCreateThread(req.user.id, req.profile);
+        const { data: messages } = await supabase.from('support_messages')
+            .select('*').eq('thread_id', thread.id).order('created_at');
+        res.json({ thread, messages: messages || [] });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/me/support', authClient, async (req, res) => {
+    try {
+        const text = (req.body.text || '').trim();
+        if (!text) return res.status(400).json({ error: 'Message required.' });
+        const thread = await getOrCreateThread(req.user.id, req.profile);
+        const isFirst = !thread.last_message_at;
+
+        await supabase.from('support_messages').insert({
+            thread_id: thread.id, sender_role: 'client',
+            sender_name: req.profile.full_name || req.profile.email, body: text,
+        });
+        await supabase.from('support_threads').update({
+            last_message: text.slice(0, 120), last_message_at: new Date().toISOString(),
+            unread_by_admin: true, status: 'open',
+        }).eq('id', thread.id);
+
+        // Auto-reply on the very first message so they're not talking to themselves
+        if (isFirst) {
+            await supabase.from('support_messages').insert({
+                thread_id: thread.id, sender_role: 'admin', sender_name: 'Harbour Team',
+                body: "Thanks for reaching out! 🌊 Youssef has been notified and will reply shortly. You'll get an email when there's a response.",
+            });
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Invite redemption (creates the client account) ──
+app.post('/api/invite/redeem', async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: 'Database not configured.' });
+    try {
+        const { token, password, full_name } = req.body;
+        if (!token || !password) return res.status(400).json({ error: 'Token and password required.' });
+
+        const { data: invite } = await supabase.from('invites').select('*').eq('token', token).single();
+        if (!invite || invite.status !== 'sent') return res.status(400).json({ error: 'This invite is invalid or already used.' });
+        if (new Date(invite.expires_at) < new Date()) return res.status(400).json({ error: 'This invite has expired.' });
+
+        const { data: created, error: cErr } = await supabase.auth.admin.createUser({
+            email: invite.email, password, email_confirm: true,
+            user_metadata: { full_name: full_name || '' },
+        });
+        if (cErr) return res.status(400).json({ error: cErr.message });
+
+        await supabase.from('profiles').upsert({
+            id: created.user.id, email: invite.email, full_name: full_name || '',
+            role: 'client', status: 'active',
+        });
+        await supabase.from('invites').update({ status: 'accepted' }).eq('id', invite.id);
+        res.json({ success: true, email: invite.email });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.listen(PORT, () => console.log(`🌊 Harbour Automation → http://localhost:${PORT}`));
