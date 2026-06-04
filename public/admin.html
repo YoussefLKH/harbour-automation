@@ -106,11 +106,9 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const cfg = await (await fetch('/api/config')).json();
 const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-const { data: { session } } = await sb.auth.getSession();
-if (!session) location.replace('/login.html');
-
 async function api(path, opts = {}) {
     const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.replace('/login.html'); return; }
     const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, ...(opts.headers || {}) } });
     if (res.status === 401) { location.replace('/login.html'); return; }
     if (res.status === 403) { location.replace('/dashboard.html'); return; }
@@ -120,10 +118,6 @@ const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 const money = c => '$' + ((c || 0) / 100).toFixed(2);
 const toast = (m) => { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); };
 window._copy = (id) => { const el = document.getElementById(id); el.select(); navigator.clipboard.writeText(el.value); toast('Link copied ✓'); };
-
-// Guard: must be admin
-const me = await api('/api/me');
-if (!me?.isAdmin) location.replace('/dashboard.html');
 
 // ════ APPLICATIONS ════
 async function loadApps() {
@@ -298,5 +292,18 @@ window.nav = (page) => {
 };
 window.signOut = async () => { await sb.auth.signOut(); location.replace('/login.html'); };
 
-// initial
-loadApps();
+// ════ INIT (runs after all handlers are wired, with error surfacing) ════
+(async function init() {
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) { location.replace('/login.html'); return; }
+        const me = await api('/api/me');
+        if (!me) return;                                  // api already redirected on 401/403
+        if (!me.isAdmin) { location.replace('/dashboard.html'); return; }
+        await loadApps();
+    } catch (e) {
+        console.error('Admin init failed:', e);
+        const el = document.getElementById('apps-list');
+        if (el) el.innerHTML = '<div class="muted-empty">Couldn\'t load the admin panel:<br><b>' + (e.message || e) + '</b><br><br>Try signing out and back in.</div>';
+    }
+})();
