@@ -59,8 +59,14 @@ RULES:
 - Be warm, plain-spoken, and confident — no corporate jargon, no buzzwords.
 - Build on their previous answers; reference specifics they mentioned.
 - Do NOT pitch packages or quote prices. This is discovery, not a sale.
-- After you have a solid understanding (typically 4-5 good answers), warmly let them know you have what you need and to tap "See what we'd automate" to view their plan.
-- Never invent facts about their business — ask instead.`;
+- Never invent facts about their business — ask instead.
+
+WRAPPING UP (important — to respect their time and our costs):
+- You only need: their industry/business, their top 1-3 time-or-money drains, and a rough sense of scale. This usually takes just 3-4 of their answers.
+- As SOON as you have that, STOP asking questions. Do not drag the conversation on.
+- Your final message must be EXACTLY this and nothing else:
+  "PERFECT! We've got everything we need to map out how we can help. 🎣 [[READY]]"
+- Never include [[READY]] in any message except that final wrap-up.`;
 
 const SUMMARY_SYSTEM = `You are a senior automation strategist at Harbour Automation (Halifax). Based on an intake interview with a small business owner, produce a concise, tailored "here's what we'd automate first" plan.
 
@@ -85,10 +91,18 @@ function toClaudeMessages(messages = []) {
 }
 
 // ── Conversational interview turn ──
+const MAX_ANSWERS = 4;             // hard cap on interview length (token control)
+const WRAP_UP = "PERFECT! We've got everything we need to map out how we can help. 🎣 [[READY]]";
+
 app.post('/api/apply/chat', async (req, res) => {
     if (!claude) return res.status(503).json({ error: 'AI is not configured.' });
     try {
         const { messages = [], business = {} } = req.body;
+
+        // Hard stop: once they've answered enough, wrap up WITHOUT calling Claude (saves tokens)
+        const answers = messages.filter(m => m.role === 'user').length;
+        if (answers >= MAX_ANSWERS) return res.json({ reply: WRAP_UP });
+
         const context = `Business context so far: ${JSON.stringify(business)}`;
         const history = toClaudeMessages(messages);
 

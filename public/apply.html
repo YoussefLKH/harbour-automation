@@ -34,6 +34,9 @@
             font-family: 'Inter', sans-serif; font-size: 0.96rem; color: var(--ink); background: #fff; transition: border-color 0.15s;
         }
         .field input:focus, .field select:focus { outline: none; border-color: var(--ocean); }
+        .field input.invalid, .field select.invalid { border-color: var(--coral-2); background: rgba(255,106,69,0.04); }
+        .ferr { color: var(--coral-2); font-size: 0.78rem; margin-top: 6px; display: none; }
+        .ferr.show { display: block; }
         .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
         /* chat */
@@ -59,6 +62,7 @@
         .icon-btn { width: 48px; height: 48px; border-radius: var(--radius); border: none; cursor: pointer; background: var(--grad-beacon); color: #fff; display: grid; place-items: center; flex-shrink: 0; transition: transform 0.15s; }
         .icon-btn:hover { transform: translateY(-2px); } .icon-btn:disabled { opacity: 0.45; cursor: default; transform: none; }
         .chat-continue { margin-top: 16px; text-align: center; }
+        .chat-done { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; padding: 12px; border-radius: var(--radius); background: rgba(20,184,166,0.08); color: var(--ocean); font-size: 0.84rem; font-weight: 600; }
 
         /* plan */
         .plan-head { text-align: center; margin-bottom: 26px; }
@@ -118,14 +122,19 @@
             <h1>First, the basics</h1>
             <p class="lead">Just enough to know who we're talking to.</p>
             <div class="field-row">
-                <div class="field"><label>Your name *</label><input id="f_name" placeholder="Jane Smith" /></div>
+                <div class="field"><label>First name *</label><input id="f_first" placeholder="Jane" autocomplete="given-name" />
+                    <div class="ferr" id="e_first">Please enter your first name.</div></div>
+                <div class="field"><label>Last name *</label><input id="f_last" placeholder="Smith" autocomplete="family-name" />
+                    <div class="ferr" id="e_last">Please enter your last name.</div></div>
+            </div>
+            <div class="field-row">
+                <div class="field"><label>Email *</label><input id="f_email" type="email" placeholder="jane@business.com" autocomplete="email" />
+                    <div class="ferr" id="e_email">Please enter a valid email address.</div></div>
+                <div class="field"><label>Phone *</label><input id="f_phone" type="tel" inputmode="numeric" placeholder="(902) 555-0123" maxlength="14" oninput="formatPhone(this)" />
+                    <div class="ferr" id="e_phone">Enter a 10-digit phone number.</div></div>
+            </div>
+            <div class="field-row">
                 <div class="field"><label>Business name</label><input id="f_business" placeholder="Smith & Co." /></div>
-            </div>
-            <div class="field-row">
-                <div class="field"><label>Email *</label><input id="f_email" type="email" placeholder="jane@business.com" /></div>
-                <div class="field"><label>Phone</label><input id="f_phone" type="tel" placeholder="(902) 555-0123" /></div>
-            </div>
-            <div class="field-row">
                 <div class="field"><label>Industry</label>
                     <select id="f_industry">
                         <option value="">Select…</option>
@@ -136,14 +145,13 @@
                         <option>Professional Services</option><option>Other</option>
                     </select>
                 </div>
-                <div class="field"><label>Team size</label>
-                    <select id="f_team">
-                        <option value="">Select…</option>
-                        <option>Just me</option><option>2–5</option><option>6–15</option><option>16–50</option><option>50+</option>
-                    </select>
-                </div>
             </div>
-            <div class="err" id="basicsErr" style="display:none;">Please add your name and a valid email.</div>
+            <div class="field" style="max-width:calc(50% - 8px);"><label>Team size</label>
+                <select id="f_team">
+                    <option value="">Select…</option>
+                    <option>Just me</option><option>2–5</option><option>6–15</option><option>16–50</option><option>50+</option>
+                </select>
+            </div>
             <div class="actions">
                 <button class="btn btn-ghost" onclick="go(0)">← Back</button>
                 <button class="btn btn-primary" onclick="startInterview()">Continue →</button>
@@ -159,14 +167,18 @@
                 <div><div class="ch-name">Harbour AI</div><div class="ch-sub">Learning about your business</div></div>
             </div>
             <div class="chat-log" id="chatLog"></div>
-            <div class="chat-input">
+            <div class="chat-input" id="chatInputRow">
                 <textarea id="chatInput" rows="1" placeholder="Type your answer…" onkeydown="chatKey(event)" oninput="autosize(this)"></textarea>
                 <button class="icon-btn" id="sendBtn" onclick="sendChat()" aria-label="Send">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 </button>
             </div>
+            <div class="chat-done" id="chatDone" style="display:none;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                Interview complete — chat closed to save your time
+            </div>
             <div class="chat-continue" id="chatContinue" style="display:none;">
-                <button class="btn btn-primary" onclick="generatePlan()">✨ See what we'd automate →</button>
+                <button class="btn btn-primary btn-lg" onclick="generatePlan()">✨ This is what we can automate for you →</button>
             </div>
         </div>
     </div>
@@ -235,15 +247,42 @@ function go(n) {
 }
 
 function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const val = id => document.getElementById(id).value.trim();
+
+// Live-format phone as (XXX) XXX-XXXX
+function formatPhone(el) {
+    const d = el.value.replace(/\D/g, '').slice(0, 10);
+    let out = '';
+    if (d.length > 0) out = '(' + d.slice(0, 3);
+    if (d.length >= 4) out += ') ' + d.slice(3, 6);
+    else if (d.length === 3) out += ')';
+    if (d.length >= 7) out += '-' + d.slice(6, 10);
+    el.value = out;
+}
+
+// Toggle a field's invalid state + error message; returns whether valid
+function mark(inputId, errId, ok) {
+    document.getElementById(inputId).classList.toggle('invalid', !ok);
+    document.getElementById(errId).classList.toggle('show', !ok);
+    return ok;
+}
 
 function startInterview() {
-    const name  = document.getElementById('f_name').value.trim();
-    const email = document.getElementById('f_email').value.trim();
-    if (!name || !validEmail(email)) { document.getElementById('basicsErr').style.display='block'; return; }
+    const first = val('f_first'), last = val('f_last'), email = val('f_email');
+    const phoneDigits = val('f_phone').replace(/\D/g, '');
+
+    // Validate all fields (no short-circuit — mark them all)
+    const okFirst = mark('f_first', 'e_first', first.length >= 1);
+    const okLast  = mark('f_last',  'e_last',  last.length  >= 1);
+    const okEmail = mark('f_email', 'e_email', validEmail(email));
+    const okPhone = mark('f_phone', 'e_phone', phoneDigits.length === 10);
+    if (!(okFirst && okLast && okEmail && okPhone)) return;
+
     Object.assign(business, {
-        full_name: name,
-        business_name: document.getElementById('f_business').value.trim(),
-        email, phone: document.getElementById('f_phone').value.trim(),
+        full_name: `${first} ${last}`,
+        business_name: val('f_business'),
+        email, phone: val('f_phone'),
         industry: document.getElementById('f_industry').value,
         team_size: document.getElementById('f_team').value,
     });
@@ -271,13 +310,27 @@ async function callChat() {
     return (await res.json()).reply;
 }
 
-async function kickoff() {
+// Reveal a Claude reply with a natural typing delay; handles the [[READY]] wrap-up signal
+async function revealReply(promise, fallback) {
     showTyping();
+    let reply;
     try {
-        const reply = await callChat();
-        hideTyping(); addBubble('assistant', reply);
-        messages.push({ role:'assistant', content: reply });
-    } catch { hideTyping(); addBubble('assistant', "Hi! Tell me a bit about your business — what do you do, and what's eating up most of your time right now?"); }
+        // run the request and a min "typing" delay together so it feels human
+        const [r] = await Promise.all([promise, sleep(900 + Math.random() * 700)]);
+        reply = r;
+    } catch { reply = fallback; }
+    hideTyping();
+
+    const isReady = /\[\[READY\]\]/.test(reply) || /\bPERFECT!/.test(reply);
+    const clean = reply.replace(/\[\[READY\]\]/g, '').trim();
+    addBubble('assistant', clean);
+    messages.push({ role: 'assistant', content: clean });
+    if (isReady) finishInterview();
+    return isReady;
+}
+
+async function kickoff() {
+    await revealReply(callChat(), "Hi! Tell me a bit about your business — what's eating up most of your time right now?");
 }
 
 function chatKey(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); } }
@@ -292,14 +345,20 @@ async function sendChat() {
     addBubble('user', text);
     messages.push({ role:'user', content: text });
     userTurns++;
-    showTyping();
-    try {
-        const reply = await callChat();
-        hideTyping(); addBubble('assistant', reply);
-        messages.push({ role:'assistant', content: reply });
-    } catch { hideTyping(); addBubble('assistant', "Got it — thanks. Anything else slowing you down day to day?"); }
+
+    const ready = await revealReply(callChat(), "Got it — thanks. Anything else slowing you down day to day?");
     document.getElementById('sendBtn').disabled = false;
-    if (userTurns >= 3) document.getElementById('chatContinue').style.display='block';
+
+    // Safety net: if the AI hasn't wrapped up after 6 answers, offer the button anyway
+    if (!ready && userTurns >= 6) document.getElementById('chatContinue').style.display = 'block';
+}
+
+// Creative close: lock the chat, show a completion chip + the plan button
+function finishInterview() {
+    document.getElementById('chatInputRow').style.display = 'none';
+    document.getElementById('chatDone').style.display = 'flex';
+    document.getElementById('chatContinue').style.display = 'block';
+    document.querySelector('.ch-sub').textContent = 'All set ✓';
 }
 
 // ── Plan ──
