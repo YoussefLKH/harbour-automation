@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Harbour Automation — Done-for-you systems for Halifax businesses</title>
+    <meta name="description" content="We design done-for-you automation systems — virtual receptionists, bookkeeping, and customer service — tailored to your business. By application only." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav class="nav" id="nav">
+    <div class="wrap nav-inner">
+        <a href="/" class="logo">
+            <svg class="logo-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="40" height="40" rx="11" fill="#0a2a43"/>
+                <path d="M20 8 L24 15 H16 L20 8Z" fill="#ff7a59"/>
+                <rect x="17.5" y="15" width="5" height="12" fill="#5eead4"/>
+                <path d="M16 27 H24 L25.5 30 H14.5 L16 27Z" fill="#fff"/>
+                <path d="M9 33 q3 -3 6 0 t6 0 t6 0" stroke="#14b8a6" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            </svg>
+            Harbour<span>.</span>
+        </a>
+        <div class="nav-links">
+            <a href="#problem">The Problem</a>
+            <a href="#services">What We Build</a>
+            <a href="#how">How It Works</a>
+            <a href="#why">Why Harbour</a>
+        </div>
+        <div class="nav-cta">
+            <a href="/login.html" class="nav-links" style="display:inline;font-size:0.92rem;font-weight:500;">Client Login</a>
+            <a href="/apply.html" class="btn btn-primary">Apply Now</a>
+        </div>
+        <button class="nav-burger" aria-label="Menu" onclick="document.querySelector('.nav-links').style.display = document.querySelector('.nav-links').style.display==='flex'?'none':'flex'">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
+        </button>
+    </div>
+</nav>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<header class="hero">
+    <div class="wrap hero-grid">
+        <div class="hero-copy">
+            <span class="eyebrow"><span class="dot"></span> By application · Halifax &amp; Atlantic Canada</span>
+            <h1>Automate the busywork.<br><span class="water">Keep the customers.</span></h1>
+            <p class="hero-sub">
+                We design done-for-you systems — virtual receptionists, bookkeeping, and customer service — tailored to your business. You stay at the helm; the busywork runs itself.
+            </p>
+            <div class="hero-actions">
+                <a href="/apply.html" class="btn btn-primary btn-lg">Apply to work with us →</a>
+                <a href="#how" class="btn btn-ghost btn-lg">See how it works</a>
+            </div>
+            <div class="hero-note">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>
+                Every system is custom-built. No templates, no lock-in.
+            </div>
+        </div>
+
+        <div class="hero-visual">
+            <div class="harbour-card">
+                <div class="hc-header">
+                    <div class="hc-avatar">H</div>
+                    <div>
+                        <div class="hc-title">Harbour Receptionist</div>
+                        <div class="hc-status">Live · handling a call</div>
+                    </div>
+                </div>
+                <div class="hc-msg caller">Hi, are you open Saturday? I'd like to book an appointment.</div>
+                <div class="hc-msg ai">We're open Sat 9–4! I can book you in at 10:30 or 1:00. Which works best?</div>
+                <div class="hc-msg caller">10:30 is perfect.</div>
+                <div class="hc-msg ai">Booked ✓ You'll get a text confirmation. See you Saturday!</div>
+                <div class="hc-footer"><span>After-hours call</span><span><b>Booked</b> in 38 seconds</span></div>
+            </div>
+            <div class="hero-float f1">
+                <div class="hf-icon" style="background:rgba(20,184,166,0.12);color:#14b8a6;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </div>
+                <div><div class="hf-label">Calls answered</div><div class="hf-val">24 / 7</div></div>
+            </div>
+            <div class="hero-float f2">
+                <div class="hf-icon" style="background:rgba(255,122,89,0.12);color:#ff7a59;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div><div class="hf-label">Saved this month</div><div class="hf-val">18 hrs</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- wave into trust strip -->
+    <svg class="wave" viewBox="0 0 1440 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0,40 C240,90 480,0 720,30 C960,60 1200,90 1440,45 L1440,90 L0,90 Z" fill="#0a2a43"/>
+    </svg>
+</header>
+
+<!-- ═══════════════ TRUST STRIP ═══════════════ -->
+<section class="trust">
+    <div class="wrap trust-inner">
+        <div class="trust-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg> Custom-built, never templated</div>
+        <div class="trust-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg> Built &amp; maintained for you</div>
+        <div class="trust-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Local Halifax team</div>
+        <div class="trust-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> No long contracts</div>
+    </div>
+</section>
+
+<!-- ═══════════════ PROBLEM ═══════════════ -->
+<section class="section problem" id="problem">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <span class="eyebrow"><span class="dot"></span> The hidden leak</span>
+            <h2>Where local businesses lose money</h2>
+            <p>It's rarely one big thing. It's a hundred small leaks — missed calls, slow replies, hours buried in admin.</p>
+        </div>
+        <div class="problem-grid">
+            <div class="problem-card reveal"><div class="pc-icon">📞</div><h3>Missed calls</h3><p>Every unanswered call after hours is a customer who just called your competitor instead.</p></div>
+            <div class="problem-card reveal"><div class="pc-icon">🧾</div><h3>Admin overload</h3><p>Hours each week lost to data entry, invoicing, and chasing paperwork that nobody enjoys.</p></div>
+            <div class="problem-card reveal"><div class="pc-icon">🐢</div><h3>Slow follow-up</h3><p>Leads go cold when replies take hours. The first to respond usually wins the job.</p></div>
+            <div class="problem-card reveal"><div class="pc-icon">😮‍💨</div><h3>No time to grow</h3><p>You're so busy running the day-to-day that the actual business never moves forward.</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ SERVICES ═══════════════ -->
+<section class="section" id="services">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <span class="eyebrow"><span class="dot"></span> What we build</span>
+            <h2>Systems that work while you don't</h2>
+            <p>We pick the right tools and wire them together into one system that fits how <em>you</em> already work.</p>
+        </div>
+        <div class="services-grid">
+            <div class="service-card reveal">
+                <div class="sc-icon">🎙️</div>
+                <div><h3>Virtual Receptionist</h3><p>Answers every call day or night, books appointments, takes messages, and texts customers back — in your business's voice.</p><span class="sc-tag">Voice AI · Booking · SMS</span></div>
+            </div>
+            <div class="service-card reveal">
+                <div class="sc-icon">📚</div>
+                <div><h3>Bookkeeping on Autopilot</h3><p>Invoices, receipts, and reconciliation handled automatically. Numbers stay clean without you touching a spreadsheet.</p><span class="sc-tag">Invoicing · Reconciliation</span></div>
+            </div>
+            <div class="service-card reveal">
+                <div class="sc-icon">💬</div>
+                <div><h3>Customer Service Desk</h3><p>Instant answers to common questions across email, chat, and text — escalating to you only when it actually matters.</p><span class="sc-tag">Chat · Email · FAQ</span></div>
+            </div>
+            <div class="service-card reveal">
+                <div class="sc-icon">🎯</div>
+                <div><h3>Lead Follow-Up</h3><p>New enquiries get an instant reply and a friendly nudge until they book — so no lead ever slips through.</p><span class="sc-tag">CRM · Reminders · Nurture</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ HOW IT WORKS ═══════════════ -->
+<svg class="wave wave-flip" viewBox="0 0 1440 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:-2px;">
+    <path d="M0,40 C240,90 480,0 720,30 C960,60 1200,90 1440,45 L1440,90 L0,90 Z" fill="#0a2a43"/>
+</svg>
+<section class="section how" id="how">
+    <div class="wrap">
+        <div class="section-head reveal">
+            <span class="eyebrow"><span class="dot"></span> The process</span>
+            <h2>From first call to fully automated</h2>
+            <p>We work with a limited number of clients at a time, so every build gets real attention.</p>
+        </div>
+        <div class="steps">
+            <div class="step reveal"><div class="step-num">1</div><h3>Apply</h3><p>Tell us about your business and where time and money are leaking. Takes about 3 minutes.</p></div>
+            <div class="step reveal"><div class="step-num">2</div><h3>Discovery call</h3><p>If it's a fit, we hop on a call and map exactly which tasks we can automate first.</p></div>
+            <div class="step reveal"><div class="step-num">3</div><h3>We build it</h3><p>We design, build, and test your system end-to-end. You review it before anything goes live.</p></div>
+            <div class="step reveal"><div class="step-num">4</div><h3>You relax</h3><p>It runs in the background. We monitor, maintain, and improve it every month.</p></div>
+        </div>
+    </div>
+</section>
+<svg class="wave" viewBox="0 0 1440 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="margin-top:-2px;">
+    <path d="M0,50 C240,10 480,80 720,50 C960,20 1200,70 1440,40 L1440,0 L0,0 Z" fill="#0a2a43"/>
+</svg>
+
+<!-- ═══════════════ WHY HARBOUR ═══════════════ -->
+<section class="section" id="why">
+    <div class="wrap why-grid">
+        <div class="reveal">
+            <span class="eyebrow"><span class="dot"></span> Why Harbour</span>
+            <h2 style="font-size:clamp(2rem,4vw,2.9rem);margin:18px 0 10px;">A partner, not a platform</h2>
+            <p style="font-size:1.08rem;">Software companies hand you a login and wish you luck. We build the whole thing for you, then stick around to keep it running.</p>
+            <div class="why-points">
+                <div class="why-point"><div class="wp-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></div><div><h4>Tailored to your business</h4><p>No two builds are the same. We start from your workflow, not a template.</p></div></div>
+                <div class="why-point"><div class="wp-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></div><div><h4>Done-for-you, fully</h4><p>You don't touch the tech. We design, build, launch, and maintain all of it.</p></div></div>
+                <div class="why-point"><div class="wp-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></div><div><h4>Local &amp; accountable</h4><p>A real Halifax team you can call — not a ticket queue in another timezone.</p></div></div>
+            </div>
+        </div>
+        <div class="why-visual reveal">
+            <div class="wv-big">100%</div>
+            <div class="wv-label">done-for-you, start to finish</div>
+            <div class="wv-row"><span>Average setup</span><b>2–3 weeks</b></div>
+            <div class="wv-row"><span>Calls answered</span><b>24/7</b></div>
+            <div class="wv-row"><span>Clients per quarter</span><b>Limited</b></div>
+            <div class="wv-row"><span>Long-term contract</span><b>Never</b></div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ CTA BAND ═══════════════ -->
+<svg class="wave wave-flip" viewBox="0 0 1440 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:-2px;">
+    <path d="M0,30 C360,80 720,0 1080,40 C1260,60 1380,50 1440,40 L1440,80 L0,80 Z" fill="#0e7490"/>
+</svg>
+<section class="section cta-band">
+    <div class="wrap reveal">
+        <h2>Ready to get your time back?</h2>
+        <p>Apply today and we'll show you exactly what we'd automate first — no pressure, no jargon.</p>
+        <a href="/apply.html" class="btn btn-light btn-lg">Apply to work with us →</a>
+        <div class="seats"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> We're currently reviewing applications for next month.</div>
+    </div>
+</section>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer class="footer">
+    <div class="wrap">
+        <div class="footer-top">
+            <div>
+                <a href="/" class="logo">
+                    <svg class="logo-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="40" height="40" rx="11" fill="#0e7490"/>
+                        <path d="M20 8 L24 15 H16 L20 8Z" fill="#ff7a59"/>
+                        <rect x="17.5" y="15" width="5" height="12" fill="#5eead4"/>
+                        <path d="M16 27 H24 L25.5 30 H14.5 L16 27Z" fill="#fff"/>
+                        <path d="M9 33 q3 -3 6 0 t6 0 t6 0" stroke="#99f6e4" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+                    </svg>
+                    Harbour<span style="color:#5eead4;">.</span>
+                </a>
+                <p class="footer-blurb">Done-for-you automation systems for small businesses across Halifax &amp; Atlantic Canada.</p>
+            </div>
+            <div class="footer-col">
+                <h5>Company</h5>
+                <a href="#problem">The Problem</a>
+                <a href="#services">What We Build</a>
+                <a href="#how">How It Works</a>
+                <a href="#why">Why Harbour</a>
+            </div>
+            <div class="footer-col">
+                <h5>Get Started</h5>
+                <a href="/apply.html">Apply Now</a>
+                <a href="/login.html">Client Login</a>
+                <a href="mailto:hello@harbourautomation.ca">Email Us</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>© 2026 Harbour Automation — Halifax, Nova Scotia, Canada</span>
+            <span>Made on the harbourfront 🌊</span>
+        </div>
+    </div>
+</footer>
+
+<script>
+    // Nav scroll state
+    const nav = document.getElementById('nav');
+    const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 20);
+    window.addEventListener('scroll', onScroll); onScroll();
+
+    // Reveal on scroll
+    const io = new IntersectionObserver((entries) => {
+        entries.forEach((e, i) => { if (e.isIntersecting) { setTimeout(() => e.target.classList.add('in'), i * 60); io.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>
