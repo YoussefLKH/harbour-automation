@@ -45,10 +45,13 @@
 <header class="hero">
     <div class="wrap hero-grid">
         <div class="hero-copy">
-            <span class="eyebrow"><span class="dot"></span> By application · Halifax &amp; Atlantic Canada</span>
+            <span class="eyebrow">
+                <svg class="spark" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.4 7.2L22 9.6l-6 4.8L18 22l-6-4-6 4 2-7.6-6-4.8 7.6-2.4z"/></svg>
+                AI-powered · By application · Halifax
+            </span>
             <h1>Automate the busywork.<br><span class="water">Keep the customers.</span></h1>
             <p class="hero-sub">
-                We design done-for-you systems — virtual receptionists, bookkeeping, and customer service — tailored to your business. You stay at the helm; the busywork runs itself.
+                We build done-for-you <strong style="color:var(--ink);">AI systems</strong> — virtual receptionists, bookkeeping, and customer service — tailored to your business. You stay at the helm; the busywork runs itself.
             </p>
             <div class="hero-actions">
                 <a href="/apply.html" class="btn btn-primary btn-lg">Apply to work with us →</a>
@@ -56,7 +59,7 @@
             </div>
             <div class="hero-note">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>
-                Every system is custom-built. No templates, no lock-in.
+                Powered by AI, built by humans in Halifax. No templates, no lock-in.
             </div>
         </div>
 
@@ -66,13 +69,18 @@
                     <div class="hc-avatar">H</div>
                     <div>
                         <div class="hc-title">Harbour Receptionist</div>
-                        <div class="hc-status">Live · handling a call</div>
+                        <div class="hc-status">AI · handling a call</div>
                     </div>
+                    <span class="ai-chip" style="margin-left:auto;">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.4 7.2L22 9.6l-6 4.8L18 22l-6-4-6 4 2-7.6-6-4.8 7.6-2.4z"/></svg>
+                        AI
+                    </span>
                 </div>
                 <div class="hc-msg caller">Hi, are you open Saturday? I'd like to book an appointment.</div>
                 <div class="hc-msg ai">We're open Sat 9–4! I can book you in at 10:30 or 1:00. Which works best?</div>
                 <div class="hc-msg caller">10:30 is perfect.</div>
-                <div class="hc-msg ai">Booked ✓ You'll get a text confirmation. See you Saturday!</div>
+                <div class="hc-typing" id="hc-typing"><span></span><span></span><span></span></div>
+                <div class="hc-msg ai" id="hc-final" style="display:none;">Booked ✓ You'll get a text confirmation. See you Saturday!</div>
                 <div class="hc-footer"><span>After-hours call</span><span><b>Booked</b> in 38 seconds</span></div>
             </div>
             <div class="hero-float f1">
@@ -255,6 +263,15 @@
     const nav = document.getElementById('nav');
     const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 20);
     window.addEventListener('scroll', onScroll); onScroll();
+
+    // Hero AI demo: type → resolve, looping so it feels live
+    const typing = document.getElementById('hc-typing');
+    const final  = document.getElementById('hc-final');
+    function runDemo() {
+        typing.style.display = 'inline-flex'; final.style.display = 'none';
+        setTimeout(() => { typing.style.display = 'none'; final.style.display = 'block'; }, 1900);
+    }
+    if (typing && final) { runDemo(); setInterval(runDemo, 6500); }
 
     // Reveal on scroll
     const io = new IntersectionObserver((entries) => {
