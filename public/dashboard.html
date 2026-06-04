@@ -76,6 +76,16 @@
         table.inv th { text-align: left; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 0 0 12px; border-bottom: 1px solid var(--line); }
         table.inv td { padding: 16px 0; border-bottom: 1px solid var(--line-2); font-size: 0.92rem; color: var(--ink); }
 
+        .field { margin-bottom: 14px; }
+        .field label { display: block; font-size: 0.84rem; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+        .field input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 0.94rem; }
+        .field input:focus { outline: none; border-color: var(--ocean); }
+        .checks { list-style: none; margin: 10px 0 14px; padding: 0; display: grid; gap: 6px; }
+        .checks li { display: flex; align-items: center; gap: 9px; font-size: 0.82rem; color: var(--muted); }
+        .checks li .sym { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 0.66rem; font-weight: 700; background: rgba(255,106,69,0.12); color: var(--coral-2); flex-shrink: 0; }
+        .checks li.ok { color: var(--ink); } .checks li.ok .sym { background: rgba(20,184,166,0.16); color: #0f766e; }
+        .set-row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line-2); font-size: 0.9rem; color: var(--muted); }
+        .set-row:last-child { border-bottom: none; } .set-row b { color: var(--ink); }
         @media (max-width: 820px) {
             .layout { grid-template-columns: 1fr; }
             .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; gap: 6px; }
@@ -98,6 +108,7 @@
         <button class="nav-item" data-page="reports" onclick="nav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg> Reports</button>
         <button class="nav-item" data-page="support" onclick="nav('support')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Support</button>
         <button class="nav-item" data-page="billing" onclick="nav('billing')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Billing</button>
+        <button class="nav-item" data-page="settings" onclick="nav('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
         <div class="side-foot">
             <div class="side-user"><b id="u-name">…</b><span id="u-biz"></span></div>
             <button class="nav-item" onclick="signOut()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Sign out</button>
@@ -151,6 +162,32 @@
             <p class="page-sub">Your invoices and payment history.</p>
             <div class="card"><table class="inv"><thead><tr><th>Description</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody id="inv-body"></tbody></table></div>
         </section>
+
+        <!-- SETTINGS -->
+        <section class="page" id="page-settings">
+            <h1 class="page-title">Settings</h1>
+            <p class="page-sub">Your account details and password.</p>
+            <div class="card" style="max-width:480px;">
+                <h3 class="sys-name" style="font-size:1.05rem;margin-bottom:14px;">Account</h3>
+                <div class="set-row"><span>Name</span><b id="set-name">—</b></div>
+                <div class="set-row"><span>Email</span><b id="set-email">—</b></div>
+                <div class="set-row"><span>Business</span><b id="set-biz">—</b></div>
+            </div>
+            <div class="card" style="max-width:480px;">
+                <h3 class="sys-name" style="font-size:1.05rem;margin-bottom:14px;">Change password</h3>
+                <div class="field"><label>New password</label><input id="np" type="password" oninput="checkNewPass()" placeholder="New password" /></div>
+                <ul class="checks" id="np-checks">
+                    <li data-rule="len"><span class="sym">✕</span> At least 8 characters</li>
+                    <li data-rule="upper"><span class="sym">✕</span> One uppercase letter</li>
+                    <li data-rule="num"><span class="sym">✕</span> One number</li>
+                    <li data-rule="special"><span class="sym">✕</span> One special character</li>
+                </ul>
+                <div class="field"><label>Confirm new password</label><input id="np2" type="password" oninput="checkNewPass()" placeholder="Re-enter new password" /></div>
+                <div id="np-match" style="display:none;font-size:0.82rem;font-weight:600;margin-bottom:14px;"></div>
+                <button class="btn btn-primary" id="np-btn" onclick="updatePassword()" disabled style="border:none;cursor:pointer;">Update password</button>
+                <div id="np-msg" style="margin-top:12px;font-size:0.88rem;"></div>
+            </div>
+        </section>
     </main>
 </div>
 
@@ -182,6 +219,37 @@ const me = await api('/api/me');
 document.getElementById('greet').textContent = (me.full_name || 'there').split(' ')[0];
 document.getElementById('u-name').textContent = me.full_name || me.email;
 document.getElementById('u-biz').textContent = me.business_name || '';
+document.getElementById('set-name').textContent = me.full_name || '—';
+document.getElementById('set-email').textContent = me.email || '—';
+document.getElementById('set-biz').textContent = me.business_name || '—';
+
+// ── Change password ──
+const PW_RULES = { len: p => p.length >= 8, upper: p => /[A-Z]/.test(p), num: p => /[0-9]/.test(p), special: p => /[^A-Za-z0-9]/.test(p) };
+window.checkNewPass = function () {
+    const p = document.getElementById('np').value, p2 = document.getElementById('np2').value;
+    let allOk = true;
+    document.querySelectorAll('#np-checks li').forEach(li => {
+        const ok = PW_RULES[li.dataset.rule](p);
+        li.classList.toggle('ok', ok); li.querySelector('.sym').textContent = ok ? '✓' : '✕';
+        if (!ok) allOk = false;
+    });
+    const m = document.getElementById('np-match'); let match = false;
+    if (p2.length === 0) { m.style.display = 'none'; }
+    else { match = p === p2; m.style.display = 'block'; m.textContent = match ? '✓ Passwords match' : '✕ Passwords don\'t match'; m.style.color = match ? '#0f766e' : 'var(--coral-2)'; }
+    document.getElementById('np-btn').disabled = !(allOk && match);
+};
+window.updatePassword = async function () {
+    const p = document.getElementById('np').value;
+    const msg = document.getElementById('np-msg'), btn = document.getElementById('np-btn');
+    btn.disabled = true; btn.textContent = 'Updating…';
+    const { error } = await sb.auth.updateUser({ password: p });
+    btn.textContent = 'Update password';
+    if (error) { msg.style.color = 'var(--coral-2)'; msg.textContent = error.message; btn.disabled = false; return; }
+    msg.style.color = '#0f766e'; msg.textContent = '✓ Password updated successfully.';
+    document.getElementById('np').value = ''; document.getElementById('np2').value = '';
+    document.querySelectorAll('#np-checks li').forEach(li => { li.classList.remove('ok'); li.querySelector('.sym').textContent = '✕'; });
+    document.getElementById('np-match').style.display = 'none';
+};
 
 // ── Overview ──
 const ov = await api('/api/me/overview');

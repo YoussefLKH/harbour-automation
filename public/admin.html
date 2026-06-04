@@ -71,6 +71,10 @@
         .b { padding: 11px 15px; border-radius: 14px; font-size: 0.9rem; max-width: 80%; white-space: pre-wrap; }
         .b.admin { background: var(--ocean); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
         .b.client { background: var(--sand); color: var(--slate); align-self: flex-start; border-bottom-left-radius: 4px; }
+        .checks { list-style: none; margin: 10px 0 14px; padding: 0; display: grid; gap: 6px; }
+        .checks li { display: flex; align-items: center; gap: 9px; font-size: 0.82rem; color: var(--muted); }
+        .checks li .sym { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 0.66rem; font-weight: 700; background: rgba(255,106,69,0.12); color: var(--coral-2); flex-shrink: 0; }
+        .checks li.ok { color: var(--ink); } .checks li.ok .sym { background: rgba(20,184,166,0.16); color: #0f766e; }
         .toast { position: fixed; bottom: 24px; right: 24px; background: var(--deep); color: #fff; padding: 14px 20px; border-radius: var(--radius); box-shadow: var(--shadow-lg); font-size: 0.9rem; opacity: 0; transform: translateY(10px); transition: all 0.3s; z-index: 999; }
         .toast.show { opacity: 1; transform: none; }
         @media (max-width:820px){ .layout{grid-template-columns:1fr;} .side{position:static;height:auto;} .main{padding:24px;} .grid2{grid-template-columns:1fr;} }
@@ -87,6 +91,7 @@
         <button class="nav-item active" data-page="applications" onclick="nav('applications')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Applications <span class="nav-count" id="appCount" style="display:none;">0</span></button>
         <button class="nav-item" data-page="clients" onclick="nav('clients')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg> Clients</button>
         <button class="nav-item" data-page="support" onclick="nav('support')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Support <span class="nav-count" id="supCount" style="display:none;">0</span></button>
+        <button class="nav-item" data-page="settings" onclick="nav('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
         <div class="side-foot">
             <button class="nav-item" onclick="signOut()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Sign out</button>
         </div>
@@ -110,6 +115,29 @@
             <h1 class="page-title">Support</h1>
             <p class="page-sub">Client conversations.</p>
             <div id="support-wrap"><div class="muted-empty">Loading…</div></div>
+        </section>
+
+        <section class="page" id="page-settings">
+            <h1 class="page-title">Settings</h1>
+            <p class="page-sub">Your admin account.</p>
+            <div class="card" style="max-width:480px;">
+                <h3 class="name" style="font-size:1.1rem;margin-bottom:6px;">Account</h3>
+                <div class="meta" id="set-email" style="margin-bottom:4px;">—</div>
+            </div>
+            <div class="card" style="max-width:480px;">
+                <h3 class="name" style="font-size:1.1rem;margin-bottom:14px;">Change password</h3>
+                <div class="field"><label>New password</label><input id="np" type="password" oninput="checkNewPass()" placeholder="New password" /></div>
+                <ul class="checks" id="np-checks">
+                    <li data-rule="len"><span class="sym">✕</span> At least 8 characters</li>
+                    <li data-rule="upper"><span class="sym">✕</span> One uppercase letter</li>
+                    <li data-rule="num"><span class="sym">✕</span> One number</li>
+                    <li data-rule="special"><span class="sym">✕</span> One special character</li>
+                </ul>
+                <div class="field"><label>Confirm new password</label><input id="np2" type="password" oninput="checkNewPass()" placeholder="Re-enter new password" /></div>
+                <div id="np-match" style="display:none;font-size:0.82rem;font-weight:600;margin-bottom:14px;"></div>
+                <button class="btn-sm btn-accept" id="np-btn" onclick="updatePassword()" disabled>Update password</button>
+                <div id="np-msg" style="margin-top:12px;font-size:0.88rem;"></div>
+            </div>
         </section>
     </main>
 </div>
@@ -349,6 +377,34 @@ window.nav = (page) => {
 };
 window.signOut = async () => { await sb.auth.signOut(); location.replace('/login.html'); };
 
+// ════ CHANGE PASSWORD ════
+const PW_RULES = { len: p => p.length >= 8, upper: p => /[A-Z]/.test(p), num: p => /[0-9]/.test(p), special: p => /[^A-Za-z0-9]/.test(p) };
+window.checkNewPass = function () {
+    const p = document.getElementById('np').value, p2 = document.getElementById('np2').value;
+    let allOk = true;
+    document.querySelectorAll('#np-checks li').forEach(li => {
+        const ok = PW_RULES[li.dataset.rule](p);
+        li.classList.toggle('ok', ok); li.querySelector('.sym').textContent = ok ? '✓' : '✕';
+        if (!ok) allOk = false;
+    });
+    const m = document.getElementById('np-match'); let match = false;
+    if (p2.length === 0) { m.style.display = 'none'; }
+    else { match = p === p2; m.style.display = 'block'; m.textContent = match ? '✓ Passwords match' : '✕ Passwords don\'t match'; m.style.color = match ? '#0f766e' : 'var(--coral-2)'; }
+    document.getElementById('np-btn').disabled = !(allOk && match);
+};
+window.updatePassword = async function () {
+    const p = document.getElementById('np').value;
+    const msg = document.getElementById('np-msg'), btn = document.getElementById('np-btn');
+    btn.disabled = true; btn.textContent = 'Updating…';
+    const { error } = await sb.auth.updateUser({ password: p });
+    btn.textContent = 'Update password';
+    if (error) { msg.style.color = 'var(--coral-2)'; msg.textContent = error.message; btn.disabled = false; return; }
+    msg.style.color = '#0f766e'; msg.textContent = '✓ Password updated successfully.';
+    document.getElementById('np').value = ''; document.getElementById('np2').value = '';
+    document.querySelectorAll('#np-checks li').forEach(li => { li.classList.remove('ok'); li.querySelector('.sym').textContent = '✕'; });
+    document.getElementById('np-match').style.display = 'none';
+};
+
 // ════ INIT (runs after all handlers are wired, with error surfacing) ════
 (async function init() {
     try {
@@ -357,6 +413,7 @@ window.signOut = async () => { await sb.auth.signOut(); location.replace('/login
         const me = await api('/api/me');
         if (!me) return;                                  // api already redirected on 401/403
         if (!me.isAdmin) { location.replace('/dashboard.html'); return; }
+        const emailEl = document.getElementById('set-email'); if (emailEl) emailEl.textContent = me.email || '';
         await loadApps();
     } catch (e) {
         console.error('Admin init failed:', e);
