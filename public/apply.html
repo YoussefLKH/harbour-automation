@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Apply — Harbour Automation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+        body { background: var(--cream); background-image: radial-gradient(rgba(10,42,67,0.05) 1px, transparent 1px); background-size: 28px 28px; min-height: 100vh; }
+        .apply-nav { padding: 20px 0; }
+        .apply-shell { max-width: 720px; margin: 0 auto; padding: 20px 24px 80px; }
+
+        /* progress */
+        .progress { height: 6px; background: rgba(10,42,67,0.08); border-radius: 100px; overflow: hidden; margin-bottom: 14px; }
+        .progress-fill { height: 100%; background: var(--grad-ocean); border-radius: 100px; width: 12%; transition: width 0.5s cubic-bezier(.4,0,.2,1); }
+        .progress-label { font-size: 0.78rem; color: var(--muted); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 34px; }
+
+        /* card */
+        .step { display: none; animation: fade 0.45s ease; }
+        .step.active { display: block; }
+        @keyframes fade { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+        .panel { background: #fff; border: 1px solid var(--line-2); border-radius: var(--radius-xl); box-shadow: var(--shadow); padding: 40px; }
+        .step h1 { font-size: clamp(1.7rem, 3.6vw, 2.4rem); margin-bottom: 14px; }
+        .step .lead { font-size: 1.06rem; color: var(--slate); margin-bottom: 28px; }
+
+        /* form */
+        .field { margin-bottom: 18px; }
+        .field label { display: block; font-size: 0.86rem; font-weight: 600; color: var(--ink); margin-bottom: 7px; }
+        .field input, .field select {
+            width: 100%; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: var(--radius);
+            font-family: 'Inter', sans-serif; font-size: 0.96rem; color: var(--ink); background: #fff; transition: border-color 0.15s;
+        }
+        .field input:focus, .field select:focus { outline: none; border-color: var(--ocean); }
+        .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        /* chat */
+        .chat-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+        .chat-avatar { width: 46px; height: 46px; border-radius: 50%; background: var(--grad-ocean); display: grid; place-items: center; color: #fff; font-family: 'Fraunces', serif; font-weight: 600; flex-shrink: 0; }
+        .chat-head .ch-name { font-weight: 700; color: var(--ink); }
+        .chat-head .ch-sub { font-size: 0.8rem; color: var(--teal); display: flex; align-items: center; gap: 6px; }
+        .chat-head .ch-sub::before { content:''; width:7px;height:7px;border-radius:50%;background:var(--teal); }
+        .chat-log { display: flex; flex-direction: column; gap: 14px; max-height: 420px; overflow-y: auto; padding: 4px 4px 8px; margin-bottom: 18px; }
+        .bubble { padding: 13px 17px; border-radius: 18px; font-size: 0.94rem; line-height: 1.55; max-width: 84%; white-space: pre-wrap; }
+        .bubble.ai { background: var(--sand); color: var(--slate); border-bottom-left-radius: 5px; align-self: flex-start; }
+        .bubble.me { background: var(--grad-ocean); color: #fff; border-bottom-right-radius: 5px; align-self: flex-end; }
+        .typing { display: inline-flex; gap: 5px; padding: 14px 18px; background: var(--sand); border-radius: 18px; border-bottom-left-radius: 5px; align-self: flex-start; }
+        .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: tp 1.3s infinite ease-in-out; }
+        .typing span:nth-child(2){animation-delay:.18s;} .typing span:nth-child(3){animation-delay:.36s;}
+        @keyframes tp { 0%,60%,100%{transform:translateY(0);opacity:.5;} 30%{transform:translateY(-5px);opacity:1;} }
+        .chat-input { display: flex; gap: 10px; align-items: flex-end; }
+        .chat-input textarea {
+            flex: 1; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: var(--radius);
+            font-family: 'Inter', sans-serif; font-size: 0.95rem; resize: none; min-height: 48px; max-height: 130px; line-height: 1.5;
+        }
+        .chat-input textarea:focus { outline: none; border-color: var(--ocean); }
+        .icon-btn { width: 48px; height: 48px; border-radius: var(--radius); border: none; cursor: pointer; background: var(--grad-beacon); color: #fff; display: grid; place-items: center; flex-shrink: 0; transition: transform 0.15s; }
+        .icon-btn:hover { transform: translateY(-2px); } .icon-btn:disabled { opacity: 0.45; cursor: default; transform: none; }
+        .chat-continue { margin-top: 16px; text-align: center; }
+
+        /* plan */
+        .plan-head { text-align: center; margin-bottom: 26px; }
+        .plan-headline { font-family: 'Fraunces', serif; font-size: 1.5rem; color: var(--ink); margin: 10px 0; }
+        .plan-summary { color: var(--slate); }
+        .rec { display: flex; gap: 16px; padding: 18px; border: 1px solid var(--line-2); border-radius: var(--radius-lg); margin-bottom: 12px; background: var(--grad-soft); }
+        .rec .rec-num { width: 32px; height: 32px; border-radius: 9px; background: var(--grad-ocean); color: #fff; display: grid; place-items: center; font-weight: 700; flex-shrink: 0; font-size: 0.9rem; }
+        .rec h4 { font-family: 'Inter',sans-serif; font-size: 1.02rem; color: var(--ink); margin-bottom: 3px; }
+        .rec p { font-size: 0.9rem; color: var(--slate); }
+        .rec .impact { display: inline-block; margin-top: 7px; font-size: 0.78rem; font-weight: 700; color: var(--ocean); background: rgba(14,116,144,0.08); padding: 3px 10px; border-radius: 100px; }
+
+        /* booking */
+        .calendly-inline-widget { border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--line); }
+        .book-note { text-align: center; color: var(--muted); font-size: 0.88rem; margin-top: 16px; }
+
+        /* loader */
+        .loader-wrap { text-align: center; padding: 50px 0; }
+        .loader { width: 54px; height: 54px; border: 4px solid rgba(14,116,144,0.15); border-top-color: var(--ocean); border-radius: 50%; margin: 0 auto 22px; animation: spin 0.9s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .actions { display: flex; gap: 12px; margin-top: 28px; }
+        .actions .btn { flex: 1; }
+        .success-icon { width: 76px; height: 76px; border-radius: 50%; background: var(--grad-ocean); display: grid; place-items: center; margin: 0 auto 22px; color: #fff; }
+        .err { color: var(--coral-2); font-size: 0.88rem; margin-top: 10px; }
+        @media (max-width:560px){ .panel{padding:26px 20px;} .field-row{grid-template-columns:1fr;} }
+    </style>
+</head>
+<body>
+
+<nav class="nav apply-nav">
+    <div class="wrap nav-inner">
+        <a href="/" class="logo">
+            <svg class="logo-mark" viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="11" fill="#0a2a43"/><path d="M20 8 L24 15 H16 L20 8Z" fill="#ff7a59"/><rect x="17.5" y="15" width="5" height="12" fill="#5eead4"/><path d="M16 27 H24 L25.5 30 H14.5 L16 27Z" fill="#fff"/><path d="M9 33 q3 -3 6 0 t6 0 t6 0" stroke="#14b8a6" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+            Harbour<span>.</span>
+        </a>
+        <a href="/" style="font-size:0.9rem;color:var(--muted);">← Back to home</a>
+    </div>
+</nav>
+
+<div class="apply-shell">
+    <div class="progress"><div class="progress-fill" id="bar"></div></div>
+    <div class="progress-label" id="barLabel">Step 1 of 5 · Welcome</div>
+
+    <!-- STEP 0 — INTRO -->
+    <div class="step active" data-step="0">
+        <div class="panel">
+            <span class="eyebrow"><svg class="spark" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.4 7.2L22 9.6l-6 4.8L18 22l-6-4-6 4 2-7.6-6-4.8 7.6-2.4z"/></svg> AI-guided · ~3 minutes</span>
+            <h1 style="margin-top:18px;">Let's see if we're a fit.</h1>
+            <p class="lead">Our AI will ask you a few quick questions about your business, then show you exactly what we'd automate first — for free, no strings. If it looks good, you'll book a call with us to dig in.</p>
+            <button class="btn btn-primary btn-lg" style="width:100%;" onclick="go(1)">Start my application →</button>
+        </div>
+    </div>
+
+    <!-- STEP 1 — BASICS -->
+    <div class="step" data-step="1">
+        <div class="panel">
+            <h1>First, the basics</h1>
+            <p class="lead">Just enough to know who we're talking to.</p>
+            <div class="field-row">
+                <div class="field"><label>Your name *</label><input id="f_name" placeholder="Jane Smith" /></div>
+                <div class="field"><label>Business name</label><input id="f_business" placeholder="Smith & Co." /></div>
+            </div>
+            <div class="field-row">
+                <div class="field"><label>Email *</label><input id="f_email" type="email" placeholder="jane@business.com" /></div>
+                <div class="field"><label>Phone</label><input id="f_phone" type="tel" placeholder="(902) 555-0123" /></div>
+            </div>
+            <div class="field-row">
+                <div class="field"><label>Industry</label>
+                    <select id="f_industry">
+                        <option value="">Select…</option>
+                        <option>Salon / Spa</option><option>Dental / Medical Clinic</option>
+                        <option>Law Firm</option><option>Contractor / Trades</option>
+                        <option>Real Estate</option><option>Restaurant / Café</option>
+                        <option>Auto / Repair</option><option>Fitness / Wellness</option>
+                        <option>Professional Services</option><option>Other</option>
+                    </select>
+                </div>
+                <div class="field"><label>Team size</label>
+                    <select id="f_team">
+                        <option value="">Select…</option>
+                        <option>Just me</option><option>2–5</option><option>6–15</option><option>16–50</option><option>50+</option>
+                    </select>
+                </div>
+            </div>
+            <div class="err" id="basicsErr" style="display:none;">Please add your name and a valid email.</div>
+            <div class="actions">
+                <button class="btn btn-ghost" onclick="go(0)">← Back</button>
+                <button class="btn btn-primary" onclick="startInterview()">Continue →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 2 — AI INTERVIEW -->
+    <div class="step" data-step="2">
+        <div class="panel">
+            <div class="chat-head">
+                <div class="chat-avatar">H</div>
+                <div><div class="ch-name">Harbour AI</div><div class="ch-sub">Learning about your business</div></div>
+            </div>
+            <div class="chat-log" id="chatLog"></div>
+            <div class="chat-input">
+                <textarea id="chatInput" rows="1" placeholder="Type your answer…" onkeydown="chatKey(event)" oninput="autosize(this)"></textarea>
+                <button class="icon-btn" id="sendBtn" onclick="sendChat()" aria-label="Send">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+            </div>
+            <div class="chat-continue" id="chatContinue" style="display:none;">
+                <button class="btn btn-primary" onclick="generatePlan()">✨ See what we'd automate →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 3 — PLAN -->
+    <div class="step" data-step="3">
+        <div class="panel">
+            <div id="planLoader" class="loader-wrap">
+                <div class="loader"></div>
+                <p style="color:var(--slate);">Analyzing your business and building your plan…</p>
+            </div>
+            <div id="planContent" style="display:none;">
+                <div class="plan-head">
+                    <span class="eyebrow"><svg class="spark" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.4 7.2L22 9.6l-6 4.8L18 22l-6-4-6 4 2-7.6-6-4.8 7.6-2.4z"/></svg> Your automation plan</span>
+                    <div class="plan-headline" id="planHeadline"></div>
+                    <p class="plan-summary" id="planSummary"></p>
+                </div>
+                <div id="planRecs"></div>
+                <div class="actions">
+                    <button class="btn btn-primary btn-lg" style="flex:1;" onclick="go(4)">Book my discovery call →</button>
+                </div>
+                <p class="book-note">Your application is saved. The call is where we map out the build together.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 4 — BOOK -->
+    <div class="step" data-step="4">
+        <div class="panel">
+            <h1>Book your discovery call</h1>
+            <p class="lead">Pick a time that suits you. We'll walk through your plan and answer everything — no pressure.</p>
+            <div id="calendlyMount"><div class="calendly-inline-widget" id="calendly" style="min-width:320px;height:640px;"></div></div>
+            <div class="actions">
+                <button class="btn btn-ghost" onclick="go(3)">← Back to my plan</button>
+                <button class="btn btn-primary" onclick="go(5)">I've booked / Finish</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 5 — SUCCESS -->
+    <div class="step" data-step="5">
+        <div class="panel" style="text-align:center;">
+            <div class="success-icon"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></div>
+            <h1>You're in the harbour 🌊</h1>
+            <p class="lead">Thanks, <span id="successName">friend</span>! We've got your application and your plan. We'll see you on the call — check your email for the confirmation.</p>
+            <a href="/" class="btn btn-primary btn-lg" style="width:100%;">Back to home</a>
+        </div>
+    </div>
+</div>
+
+<script>
+const business = {};
+let messages = [];
+let userTurns = 0;
+let calendlyLoaded = false;
+
+const steps = [...document.querySelectorAll('.step')];
+const labels = ['Welcome','Your business','A few questions','Your plan','Book a call','Done'];
+function go(n) {
+    steps.forEach(s => s.classList.toggle('active', +s.dataset.step === n));
+    document.getElementById('bar').style.width = ((n+1)/steps.length*100) + '%';
+    document.getElementById('barLabel').textContent = `Step ${Math.min(n+1,5)} of 5 · ${labels[n]}`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (n === 4) loadCalendly();
+    if (n === 5) document.getElementById('successName').textContent = (business.full_name||'friend').split(' ')[0];
+}
+
+function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+function startInterview() {
+    const name  = document.getElementById('f_name').value.trim();
+    const email = document.getElementById('f_email').value.trim();
+    if (!name || !validEmail(email)) { document.getElementById('basicsErr').style.display='block'; return; }
+    Object.assign(business, {
+        full_name: name,
+        business_name: document.getElementById('f_business').value.trim(),
+        email, phone: document.getElementById('f_phone').value.trim(),
+        industry: document.getElementById('f_industry').value,
+        team_size: document.getElementById('f_team').value,
+    });
+    go(2);
+    if (messages.length === 0) kickoff();
+}
+
+// ── Chat ──
+const log = () => document.getElementById('chatLog');
+function addBubble(role, text) {
+    const b = document.createElement('div');
+    b.className = 'bubble ' + (role === 'user' ? 'me' : 'ai');
+    b.textContent = text;
+    log().appendChild(b); log().scrollTop = log().scrollHeight;
+}
+function showTyping(){ const t=document.createElement('div'); t.className='typing'; t.id='typing'; t.innerHTML='<span></span><span></span><span></span>'; log().appendChild(t); log().scrollTop=log().scrollHeight; }
+function hideTyping(){ document.getElementById('typing')?.remove(); }
+
+async function callChat() {
+    const res = await fetch('/api/apply/chat', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ messages, business })
+    });
+    if (!res.ok) throw new Error('chat failed');
+    return (await res.json()).reply;
+}
+
+async function kickoff() {
+    showTyping();
+    try {
+        const reply = await callChat();
+        hideTyping(); addBubble('assistant', reply);
+        messages.push({ role:'assistant', content: reply });
+    } catch { hideTyping(); addBubble('assistant', "Hi! Tell me a bit about your business — what do you do, and what's eating up most of your time right now?"); }
+}
+
+function chatKey(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); } }
+function autosize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,130)+'px'; }
+
+async function sendChat() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value=''; input.style.height='auto';
+    document.getElementById('sendBtn').disabled = true;
+    addBubble('user', text);
+    messages.push({ role:'user', content: text });
+    userTurns++;
+    showTyping();
+    try {
+        const reply = await callChat();
+        hideTyping(); addBubble('assistant', reply);
+        messages.push({ role:'assistant', content: reply });
+    } catch { hideTyping(); addBubble('assistant', "Got it — thanks. Anything else slowing you down day to day?"); }
+    document.getElementById('sendBtn').disabled = false;
+    if (userTurns >= 3) document.getElementById('chatContinue').style.display='block';
+}
+
+// ── Plan ──
+async function generatePlan() {
+    go(3);
+    document.getElementById('planLoader').style.display='block';
+    document.getElementById('planContent').style.display='none';
+    try {
+        const res = await fetch('/api/apply/summary', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ messages, business })
+        });
+        const { plan } = await res.json();
+        renderPlan(plan);
+        submitApplication(plan);   // capture the lead now
+    } catch {
+        renderPlan({ headline:"Here's where we'd start", summary:"We'll map the details together on a quick call.", recommendations:[], estimate:'2-3 weeks' });
+        submitApplication(null);
+    }
+}
+function renderPlan(plan) {
+    document.getElementById('planLoader').style.display='none';
+    document.getElementById('planContent').style.display='block';
+    document.getElementById('planHeadline').textContent = plan.headline || "Here's where we'd start";
+    document.getElementById('planSummary').textContent  = plan.summary || '';
+    const recs = document.getElementById('planRecs'); recs.innerHTML='';
+    (plan.recommendations||[]).forEach((r,i)=>{
+        const d=document.createElement('div'); d.className='rec';
+        d.innerHTML = `<div class="rec-num">${i+1}</div><div><h4>${r.title||''}</h4><p>${r.desc||''}</p>${r.impact?`<span class="impact">${r.impact}</span>`:''}</div>`;
+        recs.appendChild(d);
+    });
+}
+
+async function submitApplication(plan) {
+    const transcript = messages.map(m => `${m.role==='user'?'Owner':'Harbour'}: ${m.content}`).join('\n');
+    try {
+        await fetch('/api/apply/submit', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ ...business, transcript, plan, biggest_challenge: '' })
+        });
+    } catch (e) { console.warn('submit failed', e); }
+}
+
+// ── Calendly ──
+async function loadCalendly() {
+    if (calendlyLoaded) return; calendlyLoaded = true;
+    let url = 'https://calendly.com/yousseflkh25901/discovery-call';
+    try { const c = await (await fetch('/api/config')).json(); if (c.calendlyUrl) url = c.calendlyUrl; } catch {}
+    // prefill
+    const params = new URLSearchParams({ name: business.full_name||'', email: business.email||'' });
+    document.getElementById('calendly').setAttribute('data-url', `${url}?${params.toString()}`);
+    const s = document.createElement('script');
+    s.src = 'https://assets.calendly.com/assets/external/widget.js'; s.async = true;
+    document.body.appendChild(s);
+}
+</script>
+</body>
+</html>
