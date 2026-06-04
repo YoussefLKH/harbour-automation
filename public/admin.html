@@ -102,8 +102,14 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="/js/supabase.js"></script>
+<script>
+window.addEventListener('error', e => { fetch('/api/diag?err=' + encodeURIComponent((e.message||'') + ' @ ' + (e.filename||'').split('/').pop() + ':' + (e.lineno||''))); });
+window.addEventListener('unhandledrejection', e => { fetch('/api/diag?reject=' + encodeURIComponent((e.reason && e.reason.message) || e.reason || '')); });
+fetch('/api/diag?sb=' + (typeof window.supabase) + '&createClient=' + (window.supabase && typeof window.supabase.createClient));
+</script>
 <script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const { createClient } = window.supabase;
 const cfg = await (await fetch('/api/config')).json();
 const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 async function api(path, opts = {}) {

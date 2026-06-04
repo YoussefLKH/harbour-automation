@@ -53,8 +53,9 @@
     </div>
 </div>
 
+<script src="/js/supabase.js"></script>
 <script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const { createClient } = window.supabase;
 const cfg = await (await fetch('/api/config')).json();
 const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 window._sb = sb;

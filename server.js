@@ -15,7 +15,20 @@ const PORT = process.env.PORT || 3000;
 const MODEL = 'claude-haiku-4-5-20251001';
 
 app.use(express.json({ limit: '1mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Request logger (dev) — shows method, path, status, timing
+app.use((req, res, next) => {
+    const t = Date.now();
+    res.on('finish', () => console.log(`${req.method} ${req.url} → ${res.statusCode} (${Date.now() - t}ms)`));
+    next();
+});
+
+// Never cache HTML during dev (avoids stale pages); static assets fine to cache
+app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, p) => { if (p.endsWith('.html')) res.setHeader('Cache-Control', 'no-store'); },
+}));
+
+process.on('unhandledRejection', (e) => console.error('UNHANDLED REJECTION:', e && e.message ? e.message : e));
 
 // ── Claude client ──
 const claude = process.env.ANTHROPIC_API_KEY
