@@ -104,11 +104,7 @@
 
 <script src="/js/supabase.js"></script>
 <script>
-window.addEventListener('error', e => { fetch('/api/diag?err=' + encodeURIComponent((e.message||'') + ' @ ' + (e.filename||'').split('/').pop() + ':' + (e.lineno||''))); });
-window.addEventListener('unhandledrejection', e => { fetch('/api/diag?reject=' + encodeURIComponent((e.reason && e.reason.message) || e.reason || '')); });
-fetch('/api/diag?sb=' + (typeof window.supabase) + '&createClient=' + (window.supabase && typeof window.supabase.createClient));
-</script>
-<script type="module">
+(async function () {
 const { createClient } = window.supabase;
 const cfg = await (await fetch('/api/config')).json();
 const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
@@ -313,3 +309,7 @@ window.signOut = async () => { await sb.auth.signOut(); location.replace('/login
         if (el) el.innerHTML = '<div class="muted-empty">Couldn\'t load the admin panel:<br><b>' + (e.message || e) + '</b><br><br>Try signing out and back in.</div>';
     }
 })();
+})();
+</script>
+</body>
+</html>

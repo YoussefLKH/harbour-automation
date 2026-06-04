@@ -16,8 +16,9 @@ const MODEL = 'claude-haiku-4-5-20251001';
 
 app.use(express.json({ limit: '1mb' }));
 
-// Request logger (dev) — shows method, path, status, timing
+// Request logger (dev) + kill ALL caching so nothing is served stale from the browser
 app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     const t = Date.now();
     res.on('finish', () => console.log(`${req.method} ${req.url} → ${res.statusCode} (${Date.now() - t}ms)`));
     next();
