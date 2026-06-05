@@ -59,6 +59,11 @@
         .sys-amounts { font-size: 0.85rem; color: var(--slate); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-2); }
         .pay-btn { display: inline-block; background: var(--grad-beacon); color: #fff; padding: 11px 22px; border-radius: 9px; font-weight: 700; font-size: 0.9rem; text-decoration: none; margin-top: 14px; box-shadow: 0 6px 16px rgba(255,122,89,0.3); }
         .pay-btn:hover { transform: translateY(-1px); }
+        .pay-section-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; margin: 22px 0 10px; }
+        .pay-section-label:first-child { margin-top: 0; }
+        .pay-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+        .pay-label { font-weight: 600; color: var(--ink); }
+        .pay-amt { font-size: 0.88rem; color: var(--muted); margin-top: 2px; }
         .muted-empty { text-align: center; color: var(--muted); padding: 40px; }
 
         /* Support chat */
@@ -118,7 +123,7 @@
         <button class="nav-item" data-page="systems" onclick="nav('systems')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg> My Systems</button>
         <button class="nav-item" data-page="documents" onclick="nav('documents')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Documents <span class="nav-count" id="doc-count" style="display:none;"></span></button>
         <button class="nav-item" data-page="support" onclick="nav('support')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Support</button>
-        <button class="nav-item" data-page="billing" onclick="nav('billing')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Payments</button>
+        <button class="nav-item" data-page="billing" onclick="nav('billing')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Payments <span class="nav-count" id="pay-count" style="display:none;"></span></button>
         <button class="nav-item" data-page="settings" onclick="nav('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
         <div class="side-foot">
             <div class="side-user"><b id="u-name">…</b><span id="u-biz"></span></div>
@@ -196,8 +201,10 @@
         <!-- PAYMENTS -->
         <section class="page" id="page-billing">
             <h1 class="page-title">Payments</h1>
-            <p class="page-sub">A record of your deposits, balances, and any invoices. Pay outstanding items from the <b>My Systems</b> tab.</p>
-            <div class="card"><table class="inv"><thead><tr><th>Item</th><th>Amount</th><th>Status</th></tr></thead><tbody id="inv-body"></tbody></table></div>
+            <p class="page-sub">Pay anything that's due, and view receipts for what you've paid.</p>
+            <div id="pay-due"></div>
+            <div id="pay-upcoming"></div>
+            <div id="pay-paid"></div>
         </section>
 
         <!-- SETTINGS -->
@@ -337,9 +344,9 @@ renderSystems(sysData.systems, document.getElementById('overview-systems'));
 document.getElementById('systems-list').innerHTML = sysData.systems.map(s => {
     const dep = Math.min(s.deposit_cents || 5000, s.quote_cents || 0);
     const bal = Math.max((s.quote_cents || 0) - (s.deposit_cents || 5000), 0);
-    let pay = '', extra = '', badge = stageLabel(s.status);
-    if (s.status === 'waiting_deposit' && s.deposit_url) pay = `<a class="pay-btn" href="${s.deposit_url}">Pay ${money(dep)} deposit to start →</a>`;
-    else if (s.status === 'payment_due' && !s.balance_paid && s.balance_url) pay = `<a class="pay-btn" href="${s.balance_url}">Your system is ready — pay ${money(bal)} balance →</a>`;
+    let note = '', extra = '', badge = stageLabel(s.status);
+    if (s.status === 'waiting_deposit') note = `<div class="sys-eta" style="color:var(--coral-2);">💳 ${money(dep)} deposit due — pay it in your <b>Payments</b> tab to start the build.</div>`;
+    else if (s.status === 'payment_due' && !s.balance_paid) note = `<div class="sys-eta" style="color:var(--coral-2);">💳 Your system is ready! ${money(bal)} balance due — pay it in your <b>Payments</b> tab.</div>`;
     else if (s.status === 'payment_due' && s.balance_paid) { badge = 'Preparing Delivery'; extra = `<div class="sys-eta" style="color:#0f766e;">✓ Payment received — we're preparing your delivery.</div>`; }
     else if (s.status === 'active') extra = `<div class="sys-eta" style="color:#0f766e;">✓ Live and running.</div>`;
     return `<div class="card">
@@ -349,8 +356,8 @@ document.getElementById('systems-list').innerHTML = sysData.systems.map(s => {
         </div>
         ${s.eta && (s.status === 'in_progress' || s.status === 'waiting_deposit') ? `<div class="sys-eta">Estimated completion: <b>${esc(s.eta)}</b></div>` : ''}
         ${extra}
+        ${note}
         ${s.quote_cents ? `<div class="sys-amounts">Total ${money(s.quote_cents)} &nbsp;·&nbsp; Deposit ${money(dep)} &nbsp;·&nbsp; Balance ${money(bal)}</div>` : ''}
-        ${pay}
     </div>`;
 }).join('') || '<div class="muted-empty">No systems yet.</div>';
 
@@ -391,24 +398,46 @@ window.submitResponse = async function (id) {
     await loadRequests();
 };
 
-// ── Payments (read-only ledger from systems + invoices) ──
+// ── Payments — pay due items, view receipts ──
 const inv = await api('/api/me/invoices');
-const payRows = [];
-sysData.systems.forEach(s => {
-    if (!s.quote_cents) return;
-    const dep = Math.min(s.deposit_cents || 5000, s.quote_cents);
-    const bal = Math.max(s.quote_cents - (s.deposit_cents || 5000), 0);
-    payRows.push({ item: `Deposit — ${s.name}`, amount: dep, status: s.deposit_paid ? 'Paid' : 'Due', cls: s.deposit_paid ? 'paid' : 'sent' });
-    if (bal > 0) {
-        const paid = s.balance_paid;
-        const due = s.status === 'payment_due';
-        payRows.push({ item: `Balance — ${s.name}`, amount: bal, status: paid ? 'Paid' : (due ? 'Due' : 'Upcoming'), cls: paid ? 'paid' : (due ? 'sent' : 'building') });
-    }
-});
-inv.invoices.forEach(i => payRows.push({ item: i.description || 'Invoice', amount: i.amount_cents, status: i.status === 'paid' ? 'Paid' : 'Due', cls: i.status === 'paid' ? 'paid' : 'sent' }));
-document.getElementById('inv-body').innerHTML = payRows.map(r =>
-    `<tr><td>${esc(r.item)}</td><td>${money(r.amount)}</td><td><span class="badge ${r.cls}">${r.status}</span></td></tr>`).join('')
-    || '<tr><td colspan="3" class="muted-empty">No payments yet.</td></tr>';
+const myInvoices = inv.invoices || [];
+function renderPayments() {
+    const items = [];
+    mySystems.forEach(s => {
+        if (!s.quote_cents) return;
+        const dep = Math.min(s.deposit_cents || 5000, s.quote_cents);
+        const bal = Math.max(s.quote_cents - (s.deposit_cents || 5000), 0);
+        items.push({ label: `Deposit — ${esc(s.name)}`, amount: dep, state: s.deposit_paid ? 'paid' : 'due', payUrl: s.deposit_url, receipt: s.deposit_receipt_url });
+        if (bal > 0) items.push({ label: `Balance — ${esc(s.name)}`, amount: bal, state: s.balance_paid ? 'paid' : (s.status === 'payment_due' ? 'due' : 'upcoming'), payUrl: s.balance_url, receipt: s.balance_receipt_url });
+    });
+    myInvoices.forEach(i => items.push({ label: esc(i.description || 'Charge'), amount: i.amount_cents, state: i.status === 'paid' ? 'paid' : 'due', payUrl: i.payment_url, receipt: i.receipt_url }));
+
+    const due = items.filter(i => i.state === 'due');
+    const upcoming = items.filter(i => i.state === 'upcoming');
+    const paid = items.filter(i => i.state === 'paid');
+
+    const badge = document.getElementById('pay-count');
+    if (due.length) { badge.style.display = 'inline-block'; badge.textContent = due.length; } else badge.style.display = 'none';
+
+    const row = inner => `<div class="card pay-row">${inner}</div>`;
+    document.getElementById('pay-due').innerHTML = due.length
+        ? `<div class="pay-section-label">Due now</div>` + due.map(i => row(
+            `<div><div class="pay-label">${i.label}</div><div class="pay-amt">${money(i.amount)}</div></div>
+             ${i.payUrl ? `<a class="pay-btn" style="margin-top:0;" href="${i.payUrl}">Pay ${money(i.amount)} →</a>` : '<span class="meta">Link unavailable</span>'}`)).join('')
+        : '';
+    document.getElementById('pay-upcoming').innerHTML = upcoming.length
+        ? `<div class="pay-section-label">Upcoming</div>` + upcoming.map(i => row(
+            `<div><div class="pay-label">${i.label}</div><div class="pay-amt">${money(i.amount)} · due once your build is ready</div></div>
+             <span class="badge building">Not due yet</span>`)).join('')
+        : '';
+    document.getElementById('pay-paid').innerHTML = paid.length
+        ? `<div class="pay-section-label">Paid</div>` + paid.map(i => row(
+            `<div><div class="pay-label">${i.label}</div><div class="pay-amt">${money(i.amount)}</div></div>
+             <div style="display:flex;gap:12px;align-items:center;"><span class="badge paid">Paid</span>${i.receipt ? `<a href="${i.receipt}" target="_blank" style="color:var(--ocean);font-weight:600;font-size:0.85rem;">Receipt ↗</a>` : ''}</div>`)).join('')
+        : '';
+    if (!due.length && !upcoming.length && !paid.length) document.getElementById('pay-due').innerHTML = '<div class="muted-empty">No payments yet.</div>';
+}
+renderPayments();
 
 // ── Support chat ──
 let chatLoaded = false, pollTimer = null, msgCount = 0, threadId = null;
@@ -513,6 +542,7 @@ window.nav = function (page) {
         clearInterval(pollTimer); pollTimer = setInterval(refreshSupport, 4000);
     } else { clearInterval(pollTimer); }
     if (page === 'documents') loadRequests();
+    if (page === 'billing') renderPayments();
 };
 
 window.signOut = async function () { await sb.auth.signOut(); location.replace('/login.html'); };

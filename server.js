@@ -558,7 +558,7 @@ async function createCheckout(productName, cents, email, meta = {}) {
         line_items: [{ price_data: { currency: 'cad', product_data: { name: productName }, unit_amount: cents }, quantity: 1 }],
         success_url: `${process.env.APP_URL || ''}/dashboard.html?paid=${kind}&sid={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.APP_URL || ''}/dashboard.html`,
-        metadata: { system_id: meta.system_id || '', kind },
+        metadata: { system_id: meta.system_id || '', invoice_id: meta.invoice_id || '', kind },
     });
     return session.url;
 }
@@ -654,31 +654,48 @@ app.post('/api/payment/confirm', authClient, async (req, res) => {
         const { sid } = req.body;
         if (!sid) return res.status(400).json({ error: 'Missing session id.' });
 
-        const session = await stripe.checkout.sessions.retrieve(sid);
+        // expand to grab the Stripe-hosted receipt URL
+        const session = await stripe.checkout.sessions.retrieve(sid, { expand: ['payment_intent.latest_charge'] });
         if (session.payment_status !== 'paid') return res.json({ ok: false });
+        const receiptUrl = session.payment_intent?.latest_charge?.receipt_url || null;
 
-        const systemId = session.metadata?.system_id;
         const kind = session.metadata?.kind;
-        if (!systemId) return res.json({ ok: false });
+        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
 
+        // ── One-off invoice ──
+        if (kind === 'invoice') {
+            const invoiceId = session.metadata?.invoice_id;
+            if (!invoiceId) return res.json({ ok: false });
+            const { data: inv } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
+            if (!inv || inv.client_id !== req.user.id) return res.status(403).json({ error: 'Not your invoice.' });
+            if (inv.status !== 'paid') {
+                await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
+                if (receiptUrl) await supabase.from('invoices').update({ receipt_url: receiptUrl }).eq('id', invoiceId); // no-op pre-migration
+            }
+            return res.json({ ok: true, kind });
+        }
+
+        // ── System deposit / balance ──
+        const systemId = session.metadata?.system_id;
+        if (!systemId) return res.json({ ok: false });
         const { data: sys } = await supabase.from('systems').select('*').eq('id', systemId).single();
         if (!sys || sys.client_id !== req.user.id) return res.status(403).json({ error: 'Not your system.' });
-
-        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
         const { data: profile } = await supabase.from('profiles').select('full_name,business_name,email').eq('id', sys.client_id).single();
 
         if (kind === 'deposit' && !sys.deposit_paid) {
             await supabase.from('systems').update({ deposit_paid: true, status: 'in_progress' }).eq('id', systemId);
+            if (receiptUrl) await supabase.from('systems').update({ deposit_receipt_url: receiptUrl }).eq('id', systemId);
             if (adminEmail) mailer.sendDepositPaidEmail(adminEmail, profile, sys).catch(e => console.error('Deposit-paid email failed:', e.message));
         } else if (kind === 'balance' && !sys.balance_paid) {
             await supabase.from('systems').update({ balance_paid: true }).eq('id', systemId);
+            if (receiptUrl) await supabase.from('systems').update({ balance_receipt_url: receiptUrl }).eq('id', systemId);
             if (adminEmail) mailer.sendBalancePaidEmail(adminEmail, profile, sys).catch(e => console.error('Balance-paid email failed:', e.message));
         }
         res.json({ ok: true, kind });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Create invoice + Stripe one-time payment link ──
+// ── Create one-off charge (insert first, then attach a tagged payment link) ──
 app.post('/api/admin/clients/:id/invoices', requireAdmin, async (req, res) => {
     try {
         if (!stripe) return res.status(503).json({ error: 'Stripe not configured.' });
@@ -687,24 +704,14 @@ app.post('/api/admin/clients/:id/invoices', requireAdmin, async (req, res) => {
         if (!description || !cents || cents < 50) return res.status(400).json({ error: 'Description and a valid amount are required.' });
 
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', req.params.id).single();
+        const { data: inv, error: insErr } = await supabase.from('invoices').insert({
+            client_id: req.params.id, description, amount_cents: cents, currency: 'cad', status: 'sent',
+        }).select().single();
+        if (insErr) return res.status(500).json({ error: insErr.message });
 
-        const session = await stripe.checkout.sessions.create({
-            mode: 'payment',
-            customer_email: profile?.email || undefined,
-            line_items: [{
-                price_data: { currency: 'cad', product_data: { name: description }, unit_amount: cents },
-                quantity: 1,
-            }],
-            success_url: `${process.env.APP_URL || ''}/dashboard.html?paid=1`,
-            cancel_url: `${process.env.APP_URL || ''}/dashboard.html`,
-        });
-
-        const { error } = await supabase.from('invoices').insert({
-            client_id: req.params.id, description, amount_cents: cents, currency: 'cad',
-            status: 'sent', payment_url: session.url, stripe_session_id: session.id,
-        });
-        if (error) return res.status(500).json({ error: error.message });
-        res.json({ success: true, payment_url: session.url });
+        const url = await createCheckout(description, cents, profile?.email, { invoice_id: inv.id, kind: 'invoice' });
+        await supabase.from('invoices').update({ payment_url: url }).eq('id', inv.id);
+        res.json({ success: true, payment_url: url });
     } catch (e) { console.error('invoice error:', e.message); res.status(500).json({ error: e.message }); }
 });
 
