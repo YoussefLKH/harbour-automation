@@ -36,6 +36,7 @@
         .badge.active { background: rgba(20,184,166,0.14); color: #0f766e; }
         .badge.waiting_deposit { background: rgba(244,162,97,0.16); color: #b45309; }
         .badge.payment_due { background: rgba(255,122,89,0.16); color: var(--coral-2); }
+        .badge.requested { background: rgba(14,116,144,0.12); color: #0e7490; }
         .name { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 1.02rem; color: var(--ink); letter-spacing: -0.01em; }
         .meta { font-size: 0.85rem; color: var(--muted); }
         .btn-sm { padding: 9px 18px; font-size: 0.84rem; border-radius: 8px; border: 1.5px solid transparent; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 600; transition: all 0.15s; }
@@ -252,7 +253,7 @@ async function loadClients() {
         <button class="btn-sm btn-soft" onclick="openClient('${c.id}')">Manage →</button>
     </div></div>`).join('');
 }
-const STAGES = [['waiting_deposit', 'Waiting for Deposit'], ['in_progress', 'In Progress'], ['payment_due', 'Payment Due'], ['active', 'Active']];
+const STAGES = [['requested', 'Requested'], ['waiting_deposit', 'Waiting for Deposit'], ['in_progress', 'In Progress'], ['payment_due', 'Payment Due'], ['active', 'Active']];
 const stageLabel = s => (STAGES.find(([v]) => v === s) || [, s])[1];
 let currentClientId = null;
 
@@ -268,7 +269,8 @@ window.openClient = async (id) => {
         const bal = Math.max((s.quote_cents || 0) - (s.deposit_cents || 5000), 0);
         // What does the admin need to do right now?
         let action = '';
-        if (!s.quote_cents) action = `<span class="meta" style="color:var(--coral-2);">Add a quote below to generate payment links.</span>`;
+        if (s.status === 'requested') action = `<span class="meta" style="color:var(--ocean);font-weight:600;">🆕 Requested by the client — add a quote below to send it.</span>`;
+        else if (!s.quote_cents) action = `<span class="meta" style="color:var(--coral-2);">Add a quote below to generate payment links.</span>`;
         else if (s.status === 'waiting_deposit') action = `<span class="meta">⏳ Waiting for client to pay the ${money(dep)} deposit.</span>`;
         else if (s.status === 'in_progress') action = `<button class="btn-sm btn-accept" onclick="requestPayment('${s.id}')">Request final payment</button> <span class="meta">— when the build is done.</span>`;
         else if (s.status === 'payment_due' && !s.balance_paid) action = `<span class="meta">⏳ Awaiting the ${money(bal)} balance from the client.</span>`;

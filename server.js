@@ -339,6 +339,27 @@ app.get('/api/me/systems', authClient, async (req, res) => {
     res.json({ systems: data || [] });
 });
 
+// ── Client requests a new system → creates a 'requested' system + emails admin ──
+app.post('/api/me/systems/request', authClient, async (req, res) => {
+    try {
+        const { type, need, notes } = req.body;
+        if (!type && !need) return res.status(400).json({ error: 'Tell us what you need.' });
+        const description = `${need || ''}${notes ? `\n\nNotes: ${notes}` : ''}`.trim();
+        const { error } = await supabase.from('systems').insert({
+            client_id: req.user.id, name: type || 'New system', type: null,
+            description, status: 'requested',
+        });
+        if (error) return res.status(500).json({ error: error.message });
+
+        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        if (adminEmail) {
+            const body = `Looking for: ${type || '—'}\nWhat they need: ${need || ''}${notes ? `\nNotes: ${notes}` : ''}`;
+            mailer.sendSupportRequestEmail(adminEmail, req.profile, 'new_system', body).catch(e => console.error('System-request email failed:', e.message));
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/me/reports', authClient, async (req, res) => {
     const { data, error } = await supabase.from('reports').select('*').eq('client_id', req.user.id).order('period', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
@@ -671,12 +692,14 @@ app.patch('/api/admin/systems/:id', requireAdmin, async (req, res) => {
         if (req.body.quote !== undefined && req.body.quote !== '') {
             const quote_cents = Math.round(parseFloat(req.body.quote) * 100);
             updates.quote_cents = quote_cents;
-            const { data: sys } = await supabase.from('systems').select('name,client_id,deposit_cents').eq('id', req.params.id).single();
+            const { data: sys } = await supabase.from('systems').select('name,client_id,deposit_cents,status').eq('id', req.params.id).single();
             if (sys) {
                 const { data: profile } = await supabase.from('profiles').select('email').eq('id', sys.client_id).single();
                 const links = await buildSystemLinks(sys.name, quote_cents, sys.deposit_cents, profile?.email, req.params.id);
                 updates.deposit_url = links.deposit_url;
                 updates.balance_url = links.balance_url;
+                // A freshly-quoted request becomes "Needs Deposit"
+                if (sys.status === 'requested' && req.body.status === undefined) updates.status = 'waiting_deposit';
             }
         }
 

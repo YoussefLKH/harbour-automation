@@ -60,6 +60,12 @@
         .sys-amounts { font-size: 0.85rem; color: var(--slate); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-2); }
         .pay-btn { display: inline-block; background: var(--grad-beacon); color: #fff; padding: 11px 22px; border-radius: 9px; font-weight: 700; font-size: 0.9rem; text-decoration: none; margin-top: 14px; box-shadow: 0 6px 16px rgba(255,122,89,0.3); }
         .pay-btn:hover { transform: translateY(-1px); }
+        .filters { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+        .filter-tab { background: #fff; border: 1px solid var(--line); color: var(--slate); padding: 7px 14px; border-radius: 100px; font-size: 0.84rem; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; display: inline-flex; align-items: center; gap: 7px; transition: all 0.15s; }
+        .filter-tab:hover { border-color: var(--ocean); color: var(--ocean); }
+        .filter-tab.active { background: var(--deep); color: #fff; border-color: var(--deep); }
+        .ft-count { background: rgba(10,42,67,0.08); padding: 0 7px; border-radius: 100px; font-size: 0.72rem; }
+        .filter-tab.active .ft-count { background: rgba(255,255,255,0.22); }
         .pay-section-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; margin: 22px 0 10px; }
         .pay-section-label:first-child { margin-top: 0; }
         .pay-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -165,7 +171,10 @@
         <!-- SYSTEMS -->
         <section class="page" id="page-systems">
             <h1 class="page-title">My Systems</h1>
-            <p class="page-sub">The automations we've built and run for you.</p>
+            <p class="page-sub">The automations we're building and running for you.</p>
+            <button class="pay-btn" style="background:var(--grad-ocean);box-shadow:none;margin:0 0 18px;" onclick="toggleSysRequest()">+ Request a new system</button>
+            <div id="sys-request-form" class="card" style="display:none;max-width:560px;"></div>
+            <div class="filters" id="sys-filters"></div>
             <div id="systems-list"></div>
         </section>
 
@@ -191,11 +200,6 @@
                     <span class="ac-ico" style="background:rgba(20,184,166,0.1);">🔧</span>
                     <span class="ac-title">Request a follow-up / tweak</span>
                     <span class="ac-desc">A change or check-in on one of your systems.</span>
-                </button>
-                <button class="action-card" onclick="supAction('new_system')">
-                    <span class="ac-ico" style="background:rgba(255,122,89,0.12);">✨</span>
-                    <span class="ac-title">Request a new system</span>
-                    <span class="ac-desc">Want something new automated? Tell us about it.</span>
                 </button>
                 <button class="action-card" onclick="supAction('problem')">
                     <span class="ac-ico" style="background:rgba(255,106,69,0.12);">⚠️</span>
@@ -409,7 +413,7 @@ window.updatePassword = async function () {
 let myRequests = [];
 
 // ── Systems (shared render) ──
-const STAGE_LABEL = { waiting_deposit: 'Waiting for Deposit', in_progress: 'In Progress', payment_due: 'Payment Due', active: 'Active' };
+const STAGE_LABEL = { requested: 'Requested', waiting_deposit: 'Needs Deposit', in_progress: 'In Progress', payment_due: 'Payment Due', active: 'Completed' };
 const stageLabel = s => STAGE_LABEL[s] || s;
 
 function renderSystems(list, el) {
@@ -423,11 +427,15 @@ function renderSystems(list, el) {
 const sysData = await api('/api/me/systems');
 const mySystems = sysData.systems || [];
 renderSystems(sysData.systems, document.getElementById('overview-systems'));
-document.getElementById('systems-list').innerHTML = sysData.systems.map(s => {
+
+// ── My Systems tab: filter tabs + status-aware cards ──
+let sysFilter = 'all';
+function systemCard(s) {
     const dep = Math.min(s.deposit_cents || 5000, s.quote_cents || 0);
     const bal = Math.max((s.quote_cents || 0) - (s.deposit_cents || 5000), 0);
     let note = '', extra = '', badge = stageLabel(s.status);
-    if (s.status === 'waiting_deposit') note = `<div class="sys-eta" style="color:var(--coral-2);">💳 ${money(dep)} deposit due — pay it in your <b>Payments</b> tab to start the build.</div>`;
+    if (s.status === 'requested') extra = `<div class="sys-eta" style="color:var(--ocean);">✓ Request received — we'll review it and send you a quote soon.</div>`;
+    else if (s.status === 'waiting_deposit') note = `<div class="sys-eta" style="color:var(--coral-2);">💳 ${money(dep)} deposit due — pay it in your <b>Payments</b> tab to start the build.</div>`;
     else if (s.status === 'payment_due' && !s.balance_paid) note = `<div class="sys-eta" style="color:var(--coral-2);">💳 Your system is ready! ${money(bal)} balance due — pay it in your <b>Payments</b> tab.</div>`;
     else if (s.status === 'payment_due' && s.balance_paid) { badge = 'Preparing Delivery'; extra = `<div class="sys-eta" style="color:#0f766e;">✓ Payment received — we're preparing your delivery.</div>`; }
     else if (s.status === 'active') extra = `<div class="sys-eta" style="color:#0f766e;">✓ Live and running.</div>`;
@@ -441,7 +449,51 @@ document.getElementById('systems-list').innerHTML = sysData.systems.map(s => {
         ${note}
         ${s.quote_cents ? `<div class="sys-amounts">Total ${money(s.quote_cents)} &nbsp;·&nbsp; Deposit ${money(dep)} &nbsp;·&nbsp; Balance ${money(bal)}</div>` : ''}
     </div>`;
-}).join('') || '<div class="muted-empty">No systems yet.</div>';
+}
+function renderClientSystems() {
+    // Filter tabs: All + any status that has systems
+    const order = ['requested', 'waiting_deposit', 'in_progress', 'payment_due', 'active'];
+    const present = order.filter(st => mySystems.some(s => s.status === st));
+    const tabs = [['all', 'All']].concat(present.map(st => [st, stageLabel(st)]));
+    document.getElementById('sys-filters').innerHTML = mySystems.length > 1 ? tabs.map(([v, l]) => {
+        const n = v === 'all' ? mySystems.length : mySystems.filter(s => s.status === v).length;
+        return `<button class="filter-tab ${sysFilter === v ? 'active' : ''}" onclick="setSysFilter('${v}')">${l}<span class="ft-count">${n}</span></button>`;
+    }).join('') : '';
+    const list = sysFilter === 'all' ? mySystems : mySystems.filter(s => s.status === sysFilter);
+    document.getElementById('systems-list').innerHTML = list.map(systemCard).join('')
+        || '<div class="muted-empty">No systems here yet. Use <b>Request a new system</b> above to get started.</div>';
+}
+window.setSysFilter = (v) => { sysFilter = v; renderClientSystems(); };
+renderClientSystems();
+
+// ── Request a new system (from the Systems tab) ──
+const SR_TYPES = ['🎙️ AI Receptionist (answer calls)', '📅 Appointment Booking', '💬 Customer Service Chatbot', '📱 Social DM Auto-Reply', '🎯 Lead Follow-up & Nurture', '⭐ Reviews & Reputation', '📚 Bookkeeping Automation', '🧾 Invoicing & Payment Reminders', '📧 Email / SMS Marketing', '🔁 Workflow / App Integration', '🤖 Something else (custom)'];
+window.toggleSysRequest = function () {
+    const f = document.getElementById('sys-request-form');
+    if (f.style.display === 'block') { f.style.display = 'none'; return; }
+    f.style.display = 'block';
+    f.innerHTML = `
+        <h3 class="sys-name" style="font-size:1.1rem;margin-bottom:6px;">✨ Request a new system</h3>
+        <div class="field"><label>What kind of system?</label><select id="sr-type">${SR_TYPES.map(t => `<option>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>What do you want it to do?</label><textarea id="sr-need" rows="3" placeholder="Describe what you'd like automated…"></textarea></div>
+        <div class="field"><label>Anything else? <span style="color:var(--muted);font-weight:400;">(optional)</span></label><textarea id="sr-notes" rows="2" placeholder="Budget, timeline, tools you use…"></textarea></div>
+        <button class="pay-btn" style="margin-top:0;" id="sr-submit" onclick="submitSysRequest()">Send request →</button>
+        <div id="sr-msg" style="margin-top:10px;font-size:0.88rem;"></div>`;
+};
+window.submitSysRequest = async function () {
+    const need = (document.getElementById('sr-need')?.value || '').trim();
+    const msg = document.getElementById('sr-msg');
+    if (!need) { msg.style.color = 'var(--coral-2)'; msg.textContent = 'Tell us what you need.'; return; }
+    const btn = document.getElementById('sr-submit'); btn.disabled = true; btn.textContent = 'Sending…';
+    const r = await api('/api/me/systems/request', { method: 'POST', body: JSON.stringify({
+        type: document.getElementById('sr-type').value, need, notes: (document.getElementById('sr-notes')?.value || '').trim(),
+    }) });
+    if (!r?.success) { msg.style.color = 'var(--coral-2)'; msg.textContent = r?.error || 'Could not send.'; btn.disabled = false; btn.textContent = 'Send request →'; return; }
+    // Add it to the local list + re-render
+    mySystems.unshift({ name: document.getElementById('sr-type').value, description: need, status: 'requested' });
+    document.getElementById('sys-request-form').style.display = 'none';
+    sysFilter = 'all'; renderClientSystems();
+};
 
 // ── Documents / requests from the team ──
 async function loadRequests() {
@@ -614,7 +666,7 @@ window.supAction = function (cat) {
                 <div class="field"><label>What would you like us to tweak or check?</label><textarea id="rq-msg" rows="4" placeholder="Describe the change or check-in you'd like…"></textarea></div>
                 <button class="btn btn-primary" id="rq-submit" style="border:none;cursor:pointer;" onclick="submitRequest('followup')">Send request →</button>`;
         } else {
-            html += `<p class="sys-desc" style="margin-bottom:10px;">You don't have any systems yet. Use <b>Ask a question</b> or <b>Request a new system</b> instead.</p>`;
+            html += `<p class="sys-desc" style="margin-bottom:10px;">You don't have any systems yet. Use <b>Ask a question</b> here, or <b>Request a new system</b> from the My Systems tab.</p>`;
         }
     } else if (cat === 'new_system') {
         html += `<h3 class="sys-name" style="font-size:1.1rem;margin-bottom:6px;">✨ Request a new system</h3>
