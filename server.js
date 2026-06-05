@@ -484,15 +484,68 @@ app.get('/api/admin/clients', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/clients/:id', requireAdmin, async (req, res) => {
     const id = req.params.id;
-    const [{ data: profile }, { data: systems }, { data: invoices }, { data: thread }] = await Promise.all([
+    const [{ data: profile }, { data: systems }, { data: invoices }, { data: thread }, { data: requests }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', id).single(),
         supabase.from('systems').select('*').eq('client_id', id).order('created_at'),
         supabase.from('invoices').select('*').eq('client_id', id).order('created_at', { ascending: false }),
         supabase.from('support_threads').select('*').eq('client_id', id).single(),
+        supabase.from('requests').select('*').eq('client_id', id).order('created_at', { ascending: false }),
     ]);
     let messages = [];
     if (thread) { const { data: m } = await supabase.from('support_messages').select('*').eq('thread_id', thread.id).order('created_at'); messages = m || []; }
-    res.json({ profile, systems: systems || [], invoices: invoices || [], thread: thread || null, messages });
+    res.json({ profile, systems: systems || [], invoices: invoices || [], thread: thread || null, messages, requests: requests || [] });
+});
+
+// ── Admin: create a request/intake item for a client + email them ──
+app.post('/api/admin/clients/:id/requests', requireAdmin, async (req, res) => {
+    try {
+        const { type, title, description } = req.body;
+        if (!title?.trim()) return res.status(400).json({ error: 'Title required.' });
+        await supabase.from('requests').insert({
+            client_id: req.params.id, type: type || 'custom', title: title.trim(), description: description || '', status: 'pending',
+        });
+        const { data: profile } = await supabase.from('profiles').select('full_name,email').eq('id', req.params.id).single();
+        if (profile?.email) mailer.sendDocumentRequestEmail(profile.email, profile.full_name, { title: title.trim(), description: description || '' })
+            .catch(e => console.error('Request email failed:', e.message));
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Admin: mark a request complete ──
+app.patch('/api/admin/requests/:id', requireAdmin, async (req, res) => {
+    try {
+        const updates = { updated_at: new Date().toISOString() };
+        if (req.body.status) updates.status = req.body.status;
+        const { error } = await supabase.from('requests').update(updates).eq('id', req.params.id);
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Client: list my requests ──
+app.get('/api/me/requests', authClient, async (req, res) => {
+    const { data, error } = await supabase.from('requests').select('*').eq('client_id', req.user.id).order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ requests: data || [] });
+});
+
+// ── Client: respond to a request (mark submitted) + email admin ──
+app.post('/api/me/requests/:id/respond', authClient, async (req, res) => {
+    try {
+        const { response, response_url } = req.body;
+        if (!response?.trim() && !response_url?.trim()) return res.status(400).json({ error: 'Add a response or a link.' });
+        const { data: reqRow } = await supabase.from('requests').select('*').eq('id', req.params.id).single();
+        if (!reqRow || reqRow.client_id !== req.user.id) return res.status(403).json({ error: 'Not your request.' });
+
+        await supabase.from('requests').update({
+            response: response || '', response_url: response_url || '', status: 'submitted', updated_at: new Date().toISOString(),
+        }).eq('id', req.params.id);
+
+        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        if (adminEmail) mailer.sendRequestFulfilledEmail(adminEmail, req.profile, reqRow, response || '', response_url || '')
+            .catch(e => console.error('Request-fulfilled email failed:', e.message));
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Helper: create a one-time Stripe Checkout link (CAD). meta = { system_id, kind }

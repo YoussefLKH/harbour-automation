@@ -235,4 +235,46 @@ async function sendSupportRequestEmail(to, profile, category, body) {
     return true;
 }
 
-module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail };
+// ── Client: the team needs something from you ──
+async function sendDocumentRequestEmail(to, clientName, request) {
+    if (!transporter) return false;
+    const first = esc((clientName || 'there').split(' ')[0]);
+    const inner = `<tr><td style="padding:40px;">
+        <p style="color:#0e7490;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 10px;">Action needed</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.55rem;margin:0 0 14px;">We need something from you, ${first}</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 16px;">To keep your build moving, your Harbour team has requested:</p>
+        <div style="background:#f1f6f6;border-left:3px solid #0e7490;border-radius:0 12px 12px 0;padding:16px 20px;margin:0 0 6px;">
+          <p style="color:#0a2a43;font-size:1rem;font-weight:700;margin:0 0 6px;">${esc(request.title)}</p>
+          <p style="color:#37576b;font-size:0.92rem;line-height:1.6;margin:0;white-space:pre-wrap;">${esc(request.description) || 'Open your dashboard for details.'}</p>
+        </div>
+        ${cta(APP() + '/dashboard.html', 'Provide it in your dashboard →')}
+      </td></tr>`;
+    await transporter.sendMail({
+        from: FROM(), to, subject: `Action needed: ${request.title}`,
+        html: shell(inner),
+        text: `${first}, your Harbour team needs: ${request.title}. ${request.description || ''}\n\nProvide it here: ${APP()}/dashboard.html`,
+    });
+    return true;
+}
+
+// ── Admin: a client fulfilled a request ──
+async function sendRequestFulfilledEmail(to, profile, request, response, responseUrl) {
+    if (!transporter) return false;
+    const who = esc(profile?.full_name || profile?.email || 'A client');
+    const inner = `<tr><td style="padding:40px;">
+        <p style="color:#0f766e;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 10px;">Request fulfilled ✓</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.5rem;margin:0 0 6px;">${who} responded</h1>
+        <p style="color:#6f8a9c;font-size:0.9rem;margin:0 0 16px;">Request: <b style="color:#0a2a43;">${esc(request.title)}</b></p>
+        ${response ? `<div style="background:#f1f6f6;border-left:3px solid #14b8a6;border-radius:0 12px 12px 0;padding:16px 20px;color:#37576b;font-size:0.95rem;line-height:1.6;white-space:pre-wrap;">${esc(response)}</div>` : ''}
+        ${responseUrl ? `<p style="margin:14px 0 0;"><a href="${esc(responseUrl)}" style="color:#0e7490;font-weight:600;">${esc(responseUrl)}</a></p>` : ''}
+        ${cta(APP() + '/admin.html', 'Open dashboard →', true)}
+      </td></tr>`;
+    await transporter.sendMail({
+        from: FROM(), to, subject: `✓ ${who} provided: ${request.title}`,
+        html: shell(inner),
+        text: `${who} responded to "${request.title}":\n${response || ''}\n${responseUrl || ''}\n\nView: ${APP()}/admin.html`,
+    });
+    return true;
+}
+
+module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail, sendDocumentRequestEmail, sendRequestFulfilledEmail };
