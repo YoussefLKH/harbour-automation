@@ -462,6 +462,19 @@ window.nav = (page) => {
 };
 window.signOut = async () => { await sb.auth.signOut(); location.replace('/login.html'); };
 
+// Keep the sidebar count badges fresh on every tab (not just when their tab is open)
+async function refreshBadges() {
+    try {
+        const [apps, sup] = await Promise.all([api('/api/admin/applications'), api('/api/admin/support')]);
+        const pending = (apps?.applications || []).filter(a => a.status === 'pending').length;
+        const ab = document.getElementById('appCount');
+        if (pending) { ab.style.display = 'inline-block'; ab.textContent = pending; } else ab.style.display = 'none';
+        const unread = (sup?.threads || []).filter(t => t.unread_by_admin).length;
+        const sb2 = document.getElementById('supCount');
+        if (unread) { sb2.style.display = 'inline-block'; sb2.textContent = unread; } else sb2.style.display = 'none';
+    } catch {}
+}
+
 // ════ CHANGE PASSWORD ════
 const PW_RULES = { len: p => p.length >= 8, upper: p => /[A-Z]/.test(p), num: p => /[0-9]/.test(p), special: p => /[^A-Za-z0-9]/.test(p) };
 window.checkNewPass = function () {
@@ -500,6 +513,8 @@ window.updatePassword = async function () {
         if (!me.isAdmin) { location.replace('/dashboard.html'); return; }
         const emailEl = document.getElementById('set-email'); if (emailEl) emailEl.textContent = me.email || '';
         await loadApps();
+        refreshBadges();
+        setInterval(refreshBadges, 30000);   // keep counts current while the tab stays open
     } catch (e) {
         console.error('Admin init failed:', e);
         const el = document.getElementById('apps-list');
