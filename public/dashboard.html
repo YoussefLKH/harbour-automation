@@ -199,6 +199,11 @@
                     <span class="ac-title">Report a problem</span>
                     <span class="ac-desc">Something not working right? Let us know.</span>
                 </button>
+                <button class="action-card" onclick="supAction('call')">
+                    <span class="ac-ico" style="background:rgba(14,116,144,0.12);">📞</span>
+                    <span class="ac-title">Book a call</span>
+                    <span class="ac-desc">Grab a time to talk it through with our team.</span>
+                </button>
             </div>
 
             <div id="support-form" class="card" style="display:none;max-width:640px;"></div>
@@ -612,9 +617,26 @@ window.supAction = function (cat) {
         if (hasSys) html += `<div class="field"><label>Which system?</label><select id="rq-sys">${sysOptionsHTML()}</select></div>`;
         html += `<div class="field"><label>What's going wrong?</label><textarea id="rq-msg" rows="4" placeholder="Describe the problem and when it started…"></textarea></div>
             <button class="btn btn-primary" id="rq-submit" style="border:none;cursor:pointer;" onclick="submitRequest('problem')">Report problem →</button>`;
+    } else if (cat === 'call') {
+        html += `<h3 class="sys-name" style="font-size:1.1rem;margin-bottom:6px;">📞 Book a call</h3>
+            <p class="sys-desc" style="margin-bottom:14px;">Pick a time that works for you — we'll talk it through.</p>
+            <div id="cal-mount" style="min-height:600px;"><div class="muted-empty">Loading calendar…</div></div>`;
     }
     f.innerHTML = html;
+    if (cat === 'call') loadSupportCalendly();
 };
+
+let _supCalUrl = null;
+async function loadSupportCalendly() {
+    if (_supCalUrl === null) { try { const c = await (await fetch('/api/config')).json(); _supCalUrl = c.calendlyUrl || ''; } catch { _supCalUrl = ''; } }
+    const mount = document.getElementById('cal-mount');
+    if (!mount) return;
+    if (!_supCalUrl) { mount.innerHTML = '<div class="muted-empty">Booking isn\'t set up yet — send us a message instead and we\'ll sort a time.</div>'; return; }
+    const params = new URLSearchParams({ name: me.full_name || '', email: me.email || '' });
+    mount.innerHTML = `<div class="calendly-inline-widget" data-url="${_supCalUrl}?${params.toString()}" style="min-width:320px;height:620px;"></div>`;
+    if (window.Calendly && window.Calendly.initInlineWidgets) { window.Calendly.initInlineWidgets(); }
+    else { const s = document.createElement('script'); s.src = 'https://assets.calendly.com/assets/external/widget.js'; s.async = true; document.body.appendChild(s); }
+}
 
 window.supBack = function () {
     document.getElementById('support-form').style.display = 'none';

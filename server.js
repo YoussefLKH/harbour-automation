@@ -231,6 +231,8 @@ app.post('/api/apply/submit', async (req, res) => {
         // Notify the team of the new application (non-blocking)
         const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
         if (adminEmail) mailer.sendNewApplicationEmail(adminEmail, record).catch(e => console.error('New-application email failed:', e.message));
+        // Confirm to the applicant so they're not left hanging
+        if (record.email) mailer.sendApplicantConfirmationEmail(record.email, record.full_name).catch(e => console.error('Applicant confirmation failed:', e.message));
 
         res.json({ success: true });
     } catch (e) {
@@ -443,8 +445,17 @@ app.post('/api/invite/redeem', async (req, res) => {
         });
         if (cErr) return res.status(400).json({ error: cErr.message });
 
+        // Carry over business name / phone from their application
+        let appData = {};
+        if (invite.application_id) {
+            const { data: a } = await supabase.from('applications').select('business_name,phone,full_name').eq('id', invite.application_id).single();
+            appData = a || {};
+        }
         await supabase.from('profiles').upsert({
-            id: created.user.id, email: invite.email, full_name: full_name || '',
+            id: created.user.id, email: invite.email,
+            full_name: full_name || appData.full_name || '',
+            business_name: appData.business_name || '',
+            phone: appData.phone || '',
             role: 'client', status: 'active',
         });
         await supabase.from('invites').update({ status: 'accepted' }).eq('id', invite.id);

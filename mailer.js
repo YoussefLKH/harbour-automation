@@ -277,4 +277,26 @@ async function sendRequestFulfilledEmail(to, profile, request, response, respons
     return true;
 }
 
-module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail, sendDocumentRequestEmail, sendRequestFulfilledEmail };
+// ── Applicant: "thanks for applying" confirmation ──
+async function sendApplicantConfirmationEmail(to, name) {
+    if (!transporter) return false;
+    const first = esc((name || 'there').split(' ')[0]);
+    const inner = `<tr><td style="padding:44px 40px;">
+        <p style="color:#0e7490;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 12px;">Application received</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.7rem;margin:0 0 16px;">Thanks, ${first}! 🌊</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 22px;">We've got your application and our team is reviewing it now. We'll be in touch soon — and if you booked a discovery call, we'll see you then.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f6f6;border-radius:14px;"><tr><td style="padding:18px 22px;">
+          <p style="color:#0a2a43;font-size:0.82rem;font-weight:700;margin:0 0 10px;">What happens next</p>
+          <p style="color:#37576b;font-size:0.9rem;line-height:1.7;margin:0;">1. We review your business &amp; the plan our AI mapped out<br>2. We talk it through on your discovery call<br>3. If it's a fit, we get to work building your systems</p>
+        </td></tr></table>
+        <p style="color:#9fb2bd;font-size:0.82rem;margin:22px 0 0;">Questions in the meantime? Just reply to this email.</p>
+      </td></tr>`;
+    await transporter.sendMail({
+        from: FROM(), to, subject: 'We got your application — Harbour Automation 🌊',
+        html: shell(inner),
+        text: `Thanks, ${first}! We've received your application and will be in touch soon. Reply to this email anytime with questions.`,
+    });
+    return true;
+}
+
+module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail, sendDocumentRequestEmail, sendRequestFulfilledEmail, sendApplicantConfirmationEmail };
