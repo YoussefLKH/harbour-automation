@@ -79,8 +79,17 @@
 
         .field { margin-bottom: 14px; }
         .field label { display: block; font-size: 0.84rem; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
-        .field input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 0.94rem; }
-        .field input:focus { outline: none; border-color: var(--ocean); }
+        .field input, .field select, .field textarea { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 0.94rem; color: var(--ink); background: #fff; }
+        .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--ocean); }
+        .field textarea { resize: vertical; line-height: 1.5; }
+        .support-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+        .action-card { text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; gap: 5px; font-family: 'Inter', sans-serif; }
+        .action-card:hover { border-color: var(--ocean); box-shadow: 0 6px 18px rgba(10,42,67,0.07); transform: translateY(-2px); }
+        .ac-ico { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; font-size: 1.25rem; margin-bottom: 4px; }
+        .ac-title { font-weight: 700; color: var(--ink); font-size: 0.98rem; }
+        .ac-desc { font-size: 0.85rem; color: var(--muted); }
+        .back-link { color: var(--ocean); font-weight: 600; cursor: pointer; font-size: 0.9rem; display: inline-block; margin-bottom: 16px; }
+        @media (max-width: 560px) { .support-actions { grid-template-columns: 1fr; } }
         .checks { list-style: none; margin: 10px 0 14px; padding: 0; display: grid; gap: 6px; }
         .checks li { display: flex; align-items: center; gap: 9px; font-size: 0.82rem; color: var(--muted); }
         .checks li .sym { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 0.66rem; font-weight: 700; background: rgba(255,106,69,0.12); color: var(--coral-2); flex-shrink: 0; }
@@ -108,7 +117,7 @@
         <button class="nav-item" data-page="systems" onclick="nav('systems')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg> My Systems</button>
         <button class="nav-item" data-page="reports" onclick="nav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg> Reports</button>
         <button class="nav-item" data-page="support" onclick="nav('support')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Support</button>
-        <button class="nav-item" data-page="billing" onclick="nav('billing')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Billing</button>
+        <button class="nav-item" data-page="billing" onclick="nav('billing')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Payments</button>
         <button class="nav-item" data-page="settings" onclick="nav('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</button>
         <div class="side-foot">
             <div class="side-user"><b id="u-name">…</b><span id="u-biz"></span></div>
@@ -146,9 +155,35 @@
         <!-- SUPPORT -->
         <section class="page" id="page-support">
             <h1 class="page-title">Support</h1>
-            <p class="page-sub">Message the Harbour team anytime — we're here to help.</p>
-            <div class="chat-card">
-                <div class="chat-top"><div class="ca">H</div><div><div style="font-weight:700;color:var(--ink);">Harbour Team</div><div style="font-size:0.8rem;color:var(--teal);">Typically replies within a few hours</div></div></div>
+            <p class="page-sub" id="support-sub">How can we help today?</p>
+
+            <div class="support-actions" id="support-actions">
+                <button class="action-card" onclick="supAction('question')">
+                    <span class="ac-ico" style="background:rgba(14,116,144,0.1);">💬</span>
+                    <span class="ac-title">Ask a question</span>
+                    <span class="ac-desc">A general question or message for our team.</span>
+                </button>
+                <button class="action-card" onclick="supAction('followup')">
+                    <span class="ac-ico" style="background:rgba(20,184,166,0.1);">🔧</span>
+                    <span class="ac-title">Request a follow-up / tweak</span>
+                    <span class="ac-desc">A change or check-in on one of your systems.</span>
+                </button>
+                <button class="action-card" onclick="supAction('new_system')">
+                    <span class="ac-ico" style="background:rgba(255,122,89,0.12);">✨</span>
+                    <span class="ac-title">Request a new system</span>
+                    <span class="ac-desc">Want something new automated? Tell us about it.</span>
+                </button>
+                <button class="action-card" onclick="supAction('problem')">
+                    <span class="ac-ico" style="background:rgba(255,106,69,0.12);">⚠️</span>
+                    <span class="ac-title">Report a problem</span>
+                    <span class="ac-desc">Something not working right? Let us know.</span>
+                </button>
+            </div>
+
+            <div id="support-form" class="card" style="display:none;max-width:640px;"></div>
+
+            <div class="chat-card" id="support-convo">
+                <div class="chat-top"><div class="ca">H</div><div><div style="font-weight:700;color:var(--ink);">Your conversation</div><div style="font-size:0.8rem;color:var(--teal);">Harbour team · typically replies within a few hours</div></div></div>
                 <div class="chat-msgs" id="chat-msgs"></div>
                 <div class="chat-send">
                     <textarea id="chat-in" rows="1" placeholder="Type a message…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}"></textarea>
@@ -157,11 +192,11 @@
             </div>
         </section>
 
-        <!-- BILLING -->
+        <!-- PAYMENTS -->
         <section class="page" id="page-billing">
-            <h1 class="page-title">Billing</h1>
-            <p class="page-sub">Your invoices and payment history.</p>
-            <div class="card"><table class="inv"><thead><tr><th>Description</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead><tbody id="inv-body"></tbody></table></div>
+            <h1 class="page-title">Payments</h1>
+            <p class="page-sub">A record of your deposits, balances, and any invoices. Pay outstanding items from the <b>My Systems</b> tab.</p>
+            <div class="card"><table class="inv"><thead><tr><th>Item</th><th>Amount</th><th>Status</th></tr></thead><tbody id="inv-body"></tbody></table></div>
         </section>
 
         <!-- SETTINGS -->
@@ -296,6 +331,7 @@ function renderSystems(list, el) {
         </div>`).join('');
 }
 const sysData = await api('/api/me/systems');
+const mySystems = sysData.systems || [];
 renderSystems(sysData.systems, document.getElementById('overview-systems'));
 document.getElementById('systems-list').innerHTML = sysData.systems.map(s => {
     const dep = Math.min(s.deposit_cents || 5000, s.quote_cents || 0);
@@ -330,11 +366,24 @@ document.getElementById('reports-list').innerHTML = rep.reports.map(r => `
         <p class="sys-desc">${esc(r.summary||'')}</p>
     </div>`).join('') || '<div class="muted-empty">Your first report will appear after your systems run for a full month.</div>';
 
-// ── Billing ──
+// ── Payments (read-only ledger from systems + invoices) ──
 const inv = await api('/api/me/invoices');
-document.getElementById('inv-body').innerHTML = inv.invoices.map(i => `
-    <tr><td>${esc(i.description||'')}</td><td>${money(i.amount_cents)}</td><td>${i.due_date||'—'}</td><td><span class="badge ${i.status}">${i.status}</span></td></tr>`).join('')
-    || '<tr><td colspan="4" class="muted-empty">No invoices yet.</td></tr>';
+const payRows = [];
+sysData.systems.forEach(s => {
+    if (!s.quote_cents) return;
+    const dep = Math.min(s.deposit_cents || 5000, s.quote_cents);
+    const bal = Math.max(s.quote_cents - (s.deposit_cents || 5000), 0);
+    payRows.push({ item: `Deposit — ${s.name}`, amount: dep, status: s.deposit_paid ? 'Paid' : 'Due', cls: s.deposit_paid ? 'paid' : 'sent' });
+    if (bal > 0) {
+        const paid = s.balance_paid;
+        const due = s.status === 'payment_due';
+        payRows.push({ item: `Balance — ${s.name}`, amount: bal, status: paid ? 'Paid' : (due ? 'Due' : 'Upcoming'), cls: paid ? 'paid' : (due ? 'sent' : 'building') });
+    }
+});
+inv.invoices.forEach(i => payRows.push({ item: i.description || 'Invoice', amount: i.amount_cents, status: i.status === 'paid' ? 'Paid' : 'Due', cls: i.status === 'paid' ? 'paid' : 'sent' }));
+document.getElementById('inv-body').innerHTML = payRows.map(r =>
+    `<tr><td>${esc(r.item)}</td><td>${money(r.amount)}</td><td><span class="badge ${r.cls}">${r.status}</span></td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted-empty">No payments yet.</td></tr>';
 
 // ── Support chat ──
 let chatLoaded = false, pollTimer = null, msgCount = 0, threadId = null;
@@ -366,6 +415,69 @@ async function refreshSupport() {
     const data = await api('/api/me/support');
     if (data.messages.length !== msgCount) { renderMsgs(data.messages); msgCount = data.messages.length; }
 }
+
+// ── Support actions (guided requests) ──
+const taStyle = "width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:0.94rem;resize:vertical;line-height:1.5;";
+function sysOptionsHTML() { return mySystems.map(s => `<option>${esc(s.name)}</option>`).join(''); }
+
+window.supAction = function (cat) {
+    document.getElementById('support-actions').style.display = 'none';
+    const f = document.getElementById('support-form');
+    f.style.display = 'block';
+    const back = `<span class="back-link" onclick="supBack()">← Back to options</span>`;
+    const hasSys = mySystems.length > 0;
+    let html = back;
+
+    if (cat === 'question') {
+        html += `<h3 class="sys-name" style="font-size:1.1rem;margin-bottom:6px;">💬 Ask a question</h3>
+            <div class="field"><label>Your message</label><textarea id="rq-msg" rows="4" placeholder="What can we help you with?"></textarea></div>
+            <button class="btn btn-primary" id="rq-submit" style="border:none;cursor:pointer;" onclick="submitRequest('question')">Send →</button>`;
+    } else if (cat === 'followup') {
+        html += `<h3 class="sys-name" style="font-size:1.1rem;margin-bottom:6px;">🔧 Request a follow-up / tweak</h3>`;
+        if (hasSys) {
+            html += `<div class="field"><label>Which system?</label><select id="rq-sys">${sysOptionsHTML()}</select></div>
+                <div class="field"><label>What would you like us to tweak or check?</label><textarea id="rq-msg" rows="4" placeholder="Describe the change or check-in you'd like…"></textarea></div>
+                <button class="btn btn-primary" id="rq-submit" style="border:none;cursor:pointer;" onclick="submitRequest('followup')">Send request →</button>`;
+        } else {
+            html += `<p class="sys-desc" style="margin-bottom:10px;">You don't have any systems yet. Use <b>Ask a question</b> or <b>Request a new system</b> instead.</p>`;
+        }
+    } else if (cat === 'new_system') {
+        html += `<h3 class="sys-name" style="font-size:1.1rem;margin-bottom:6px;">✨ Request a new system</h3>
+            <div class="field"><label>What kind of system?</label><select id="rq-type"><option>Virtual Receptionist</option><option>Bookkeeping</option><option>Customer Service</option><option>Lead Follow-up</option><option>Something else</option></select></div>
+            <div class="field"><label>What do you want it to do?</label><textarea id="rq-need" rows="3" placeholder="Describe what you'd like automated…"></textarea></div>
+            <div class="field"><label>Anything else we should know? <span style="color:var(--muted);font-weight:400;">(optional)</span></label><textarea id="rq-notes" rows="2" placeholder="Budget, timeline, tools you use…"></textarea></div>
+            <button class="btn btn-primary" id="rq-submit" style="border:none;cursor:pointer;" onclick="submitRequest('new_system')">Send request →</button>`;
+    } else if (cat === 'problem') {
+        html += `<h3 class="sys-name" style="font-size:1.1rem;margin-bottom:6px;">⚠️ Report a problem</h3>`;
+        if (hasSys) html += `<div class="field"><label>Which system?</label><select id="rq-sys">${sysOptionsHTML()}</select></div>`;
+        html += `<div class="field"><label>What's going wrong?</label><textarea id="rq-msg" rows="4" placeholder="Describe the problem and when it started…"></textarea></div>
+            <button class="btn btn-primary" id="rq-submit" style="border:none;cursor:pointer;" onclick="submitRequest('problem')">Report problem →</button>`;
+    }
+    f.innerHTML = html;
+};
+
+window.supBack = function () {
+    document.getElementById('support-form').style.display = 'none';
+    document.getElementById('support-actions').style.display = 'grid';
+};
+
+window.submitRequest = async function (cat) {
+    const payload = { category: cat };
+    const v = id => (document.getElementById(id)?.value || '').trim();
+    if (cat === 'question') { if (!v('rq-msg')) return; payload.message = v('rq-msg'); }
+    else if (cat === 'followup') { if (!v('rq-msg')) return; payload.system = v('rq-sys'); payload.message = v('rq-msg'); }
+    else if (cat === 'new_system') { if (!v('rq-need')) return; payload.type = v('rq-type'); payload.need = v('rq-need'); payload.notes = v('rq-notes'); }
+    else if (cat === 'problem') { if (!v('rq-msg')) return; payload.system = v('rq-sys'); payload.message = v('rq-msg'); }
+
+    const btn = document.getElementById('rq-submit'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    try { await api('/api/me/support/request', { method: 'POST', body: JSON.stringify(payload) }); } catch {}
+
+    supBack();
+    if (!chatLoaded) { chatLoaded = true; await loadSupport(); } else { await refreshSupport(); }
+    clearInterval(pollTimer); pollTimer = setInterval(refreshSupport, 4000);
+    document.getElementById('support-sub').textContent = '✓ Sent! We\'ll reply in your conversation below.';
+    document.getElementById('support-convo').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 
 // ── Nav ──
 window.nav = function (page) {

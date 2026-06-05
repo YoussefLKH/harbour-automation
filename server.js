@@ -363,6 +363,45 @@ app.post('/api/me/support', authClient, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Guided support requests (question / followup / new system / problem) ──
+app.post('/api/me/support/request', authClient, async (req, res) => {
+    try {
+        const { category, system, type, need, notes, message } = req.body;
+        const thread = await getOrCreateThread(req.user.id, req.profile);
+
+        let body = '';
+        if (category === 'followup') body = `🔧 Follow-up request — ${system || 'a system'}\n\n${message || ''}`;
+        else if (category === 'new_system') body = `✨ New system request\n\nLooking for: ${type || '—'}\nWhat they need: ${need || ''}${notes ? `\nNotes: ${notes}` : ''}`;
+        else if (category === 'problem') body = `⚠️ Problem report — ${system || 'a system'}\n\n${message || ''}`;
+        else body = (message || '').trim();
+        if (!body.trim()) return res.status(400).json({ error: 'Message required.' });
+
+        const isFirst = !thread.last_message_at;
+        await supabase.from('support_messages').insert({
+            thread_id: thread.id, sender_role: 'client',
+            sender_name: req.profile.full_name || req.profile.email, body,
+        });
+        await supabase.from('support_threads').update({
+            last_message: body.slice(0, 120), last_message_at: new Date().toISOString(),
+            unread_by_admin: true, status: 'open',
+        }).eq('id', thread.id);
+
+        if (isFirst) {
+            await supabase.from('support_messages').insert({
+                thread_id: thread.id, sender_role: 'admin', sender_name: 'Harbour Team',
+                body: "Thanks for reaching out! 🌊 We've got this and will reply shortly — you'll get an email when there's a response.",
+            });
+        }
+
+        // Email the admin for actionable requests (new lead / something broken)
+        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        if (adminEmail && (category === 'new_system' || category === 'problem')) {
+            mailer.sendSupportRequestEmail(adminEmail, req.profile, category, body).catch(e => console.error('Support-request email failed:', e.message));
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Invite redemption (creates the client account) ──
 app.post('/api/invite/redeem', async (req, res) => {
     if (!supabase) return res.status(503).json({ error: 'Database not configured.' });

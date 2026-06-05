@@ -210,4 +210,29 @@ async function sendShippedEmail(to, clientName, sys) {
     return true;
 }
 
-module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail };
+// ── Admin: a client submitted a new-system request or problem report ──
+async function sendSupportRequestEmail(to, profile, category, body) {
+    if (!transporter) return false;
+    const who = esc(profile?.full_name || profile?.email || 'A client');
+    const biz = profile?.business_name ? ` · ${esc(profile.business_name)}` : '';
+    const isNew = category === 'new_system';
+    const accent = isNew ? '#0e7490' : '#ef4444';
+    const label = isNew ? 'New system request ✨' : 'Problem reported ⚠️';
+    const title = isNew ? 'A client wants a new system' : 'A client reported a problem';
+    const inner = `<tr><td style="padding:40px;">
+        <p style="color:${accent};font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 10px;">${label}</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.5rem;margin:0 0 6px;">${title}</h1>
+        <p style="color:#6f8a9c;font-size:0.9rem;margin:0 0 18px;">From <b style="color:#0a2a43;">${who}</b>${biz}</p>
+        <div style="background:#f1f6f6;border-left:3px solid ${accent};border-radius:0 12px 12px 0;padding:16px 20px;color:#37576b;font-size:0.95rem;line-height:1.6;white-space:pre-wrap;">${esc(body)}</div>
+        ${cta(APP() + '/admin.html', 'Open Support →', true)}
+      </td></tr>`;
+    await transporter.sendMail({
+        from: FROM(), to,
+        subject: isNew ? `✨ New system request from ${who}` : `⚠️ Problem reported by ${who}`,
+        html: shell(inner),
+        text: `${title} from ${who}:\n\n${body}\n\nReply in the admin Support tab: ${APP()}/admin.html`,
+    });
+    return true;
+}
+
+module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail };
