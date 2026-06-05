@@ -45,6 +45,12 @@
         .btn-reject:hover { border-color: var(--coral-2); color: var(--coral-2); }
         .btn-soft { background: #fff; color: var(--ink); border-color: var(--line); }
         .btn-soft:hover { border-color: var(--ocean); color: var(--ocean); }
+        .filters { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
+        .filter-tab { background: #fff; border: 1px solid var(--line); color: var(--slate); padding: 8px 15px; border-radius: 100px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; display: inline-flex; align-items: center; gap: 7px; transition: all 0.15s; }
+        .filter-tab:hover { border-color: var(--ocean); color: var(--ocean); }
+        .filter-tab.active { background: var(--deep); color: #fff; border-color: var(--deep); }
+        .ft-count { background: rgba(10,42,67,0.08); padding: 0 7px; border-radius: 100px; font-size: 0.72rem; }
+        .filter-tab.active .ft-count { background: rgba(255,255,255,0.22); }
         .detail { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); display: none; }
         .detail.open { display: block; }
         .kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 14px; font-size: 0.9rem; margin-bottom: 16px; }
@@ -103,6 +109,7 @@
         <section class="page active" id="page-applications">
             <h1 class="page-title">Applications</h1>
             <p class="page-sub">Review applicants, read their AI interview, then accept or pass.</p>
+            <div class="filters" id="apps-filters"></div>
             <div id="apps-list"><div class="muted-empty">Loading…</div></div>
         </section>
 
@@ -165,23 +172,42 @@ const toast = (m) => { const t = document.getElementById('toast'); t.textContent
 window._copy = (id) => { const el = document.getElementById(id); el.select(); navigator.clipboard.writeText(el.value); toast('Link copied ✓'); };
 
 // ════ APPLICATIONS ════
+let allApps = [];
+let appsFilter = 'pending';
+const SLABEL = { pending: 'pending', reviewing: 'in talks', accepted: 'accepted', rejected: 'passed' };
+
 async function loadApps() {
     const { applications } = await api('/api/admin/applications');
-    const pending = applications.filter(a => a.status === 'pending').length;
+    allApps = applications || [];
+    const pending = allApps.filter(a => a.status === 'pending').length;
     const badge = document.getElementById('appCount');
     if (pending) { badge.style.display = 'inline-block'; badge.textContent = pending; } else badge.style.display = 'none';
-
+    renderAppFilters();
+    renderApps();
+}
+function renderAppFilters() {
+    const counts = {};
+    allApps.forEach(a => counts[a.status] = (counts[a.status] || 0) + 1);
+    const tabs = [['pending', 'Pending'], ['reviewing', 'In talks'], ['accepted', 'Accepted'], ['rejected', 'Passed'], ['all', 'All']];
+    document.getElementById('apps-filters').innerHTML = tabs.map(([v, l]) => {
+        const n = v === 'all' ? allApps.length : (counts[v] || 0);
+        return `<button class="filter-tab ${appsFilter === v ? 'active' : ''}" onclick="setAppsFilter('${v}')">${l}${n ? `<span class="ft-count">${n}</span>` : ''}</button>`;
+    }).join('');
+}
+window.setAppsFilter = (v) => { appsFilter = v; renderAppFilters(); renderApps(); };
+function renderApps() {
+    const list = appsFilter === 'all' ? allApps : allApps.filter(a => a.status === appsFilter);
     const el = document.getElementById('apps-list');
-    if (!applications.length) { el.innerHTML = '<div class="muted-empty">No applications yet. They\'ll appear here as people apply.</div>'; return; }
-    el.innerHTML = applications.map(a => {
+    if (!list.length) { el.innerHTML = `<div class="muted-empty">No ${appsFilter === 'all' ? '' : (SLABEL[appsFilter] || '') + ' '}applications here.</div>`; return; }
+    el.innerHTML = list.map(a => {
         const plan = a.plan || {};
-        const recs = (plan.recommendations || []).map((r,i) => `<div class="plan-rec"><b>${i+1}. ${esc(r.title||'')}</b> — ${esc(r.desc||'')} ${r.impact?`<span style="color:var(--ocean);">(${esc(r.impact)})</span>`:''}</div>`).join('');
+        const recs = (plan.recommendations || []).map((r, i) => `<div class="plan-rec"><b>${i + 1}. ${esc(r.title || '')}</b> — ${esc(r.desc || '')} ${r.impact ? `<span style="color:var(--ocean);">(${esc(r.impact)})</span>` : ''}</div>`).join('');
         return `<div class="card">
             <div class="row">
                 <div><div class="name">${esc(a.full_name)} <span class="meta">· ${esc(a.business_name||'—')}</span></div>
                     <div class="meta">${esc(a.industry||'')} · ${esc(a.email)} · ${esc(a.phone||'')}</div></div>
                 <div style="display:flex;gap:8px;align-items:center;">
-                    <span class="badge ${a.status}">${a.status}</span>
+                    <span class="badge ${a.status}">${SLABEL[a.status] || a.status}</span>
                     <button class="btn-sm btn-soft" onclick="toggleDetail('${a.id}')">View</button>
                 </div>
             </div>
@@ -200,17 +226,20 @@ async function loadApps() {
     }).join('');
 }
 window.toggleDetail = (id) => document.getElementById('d-' + id).classList.toggle('open');
-window.setStatus = async (id, status) => { await api('/api/admin/applications/' + id, { method: 'PATCH', body: JSON.stringify({ status }) }); toast('Updated'); loadApps(); };
+window.setStatus = async (id, status) => { await api('/api/admin/applications/' + id, { method: 'PATCH', body: JSON.stringify({ status }) }); toast('Updated ✓'); loadApps(); };
 window.acceptApp = async (id) => {
     const r = await api('/api/admin/applications/' + id + '/accept', { method: 'POST' });
     if (!r?.success) { toast(r?.error || 'Failed'); return; }
-    document.getElementById('accept-result-' + id).innerHTML =
+    toast(r.emailed ? 'Accepted & emailed ✓' : 'Accepted ✓');
+    // Move to the Accepted tab, reopen this card, and show the activation link
+    appsFilter = 'accepted';
+    await loadApps();
+    document.getElementById('d-' + id)?.classList.add('open');
+    const ar = document.getElementById('accept-result-' + id);
+    if (ar) ar.innerHTML =
         `<div class="block-label" style="margin-top:16px;">Activation link ${r.emailed ? '· emailed ✓' : '(email off — copy &amp; send)'}</div>
          <div class="linkbox"><input id="lnk-${id}" value="${r.link}" readonly /><button class="btn-sm btn-accept" onclick="_copy('lnk-${id}')">Copy</button></div>`;
-    toast(r.emailed ? 'Accepted & emailed ✓' : 'Accepted ✓');
-    loadAppsKeepOpen(id);
 };
-async function loadAppsKeepOpen(id) { await loadApps(); document.getElementById('d-' + id)?.classList.add('open'); }
 
 // ════ CLIENTS ════
 async function loadClients() {
@@ -419,10 +448,10 @@ async function loadSupport() {
     if (unread) { badge.style.display = 'inline-block'; badge.textContent = unread; } else badge.style.display = 'none';
     const wrap = document.getElementById('support-wrap');
     if (!threads.length) { wrap.innerHTML = '<div class="muted-empty">No conversations yet.</div>'; return; }
-    wrap.innerHTML = threads.map(t => `<div class="card"><div class="row">
-        <div><div class="name" style="font-size:1.05rem;">${esc(t.client?.business_name || t.client?.full_name || 'Client')} ${t.unread_by_admin?'<span class="badge rejected" style="background:var(--coral);color:#fff;">new</span>':''}</div>
-            <div class="meta">${esc(t.last_message || 'No messages')}</div></div>
-        <button class="btn-sm btn-soft" onclick="openThread('${t.id}','${esc(t.client?.full_name||'')}')">Open →</button>
+    wrap.innerHTML = threads.map(t => `<div class="card"><div class="row" style="gap:16px;">
+        <div style="flex:1;min-width:0;"><div class="name" style="font-size:1.05rem;">${esc(t.client?.business_name || t.client?.full_name || 'Client')} ${t.unread_by_admin?'<span class="badge rejected" style="background:var(--coral);color:#fff;">new</span>':''}</div>
+            <div class="meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.last_message || 'No messages')}</div></div>
+        <button class="btn-sm btn-soft" style="flex-shrink:0;" onclick="openThread('${t.id}','${esc(t.client?.full_name||'')}')">Open →</button>
     </div>`).join('');
 }
 window.openThread = async (threadId, name) => {

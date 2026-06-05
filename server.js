@@ -531,7 +531,9 @@ app.post('/api/admin/applications/:id/accept', requireAdmin, async (req, res) =>
         });
         await supabase.from('applications').update({ status: 'accepted', reviewed_at: new Date().toISOString() }).eq('id', appn.id);
 
-        const link = `${process.env.APP_URL || ''}/login.html?invite=${token}`;
+        // Prefer APP_URL, but fall back to the live request host so the link is never localhost in prod
+        const base = process.env.APP_URL || `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`;
+        const link = `${base}/login.html?invite=${token}`;
         let emailed = false;
         try { emailed = await mailer.sendActivationEmail(appn.email, appn.full_name, link); }
         catch (e) { console.error('Activation email failed:', e.message); }
