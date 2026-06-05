@@ -14,6 +14,23 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 const MODEL = 'claude-haiku-4-5-20251001';
 
+// ── Stripe webhook — MUST be before express.json (needs the raw body for signature verification) ──
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(503).end();
+    let event;
+    try {
+        event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (e) {
+        console.error('Webhook signature verification failed:', e.message);
+        return res.status(400).send(`Webhook Error: ${e.message}`);
+    }
+    if (event.type === 'checkout.session.completed') {
+        try { await fulfillPaidSession(event.data.object.id); }
+        catch (e) { console.error('Webhook fulfill failed:', e.message); }
+    }
+    res.json({ received: true });
+});
+
 app.use(express.json({ limit: '1mb' }));
 
 // Request logger (dev) + kill ALL caching so nothing is served stale from the browser
@@ -694,51 +711,52 @@ app.post('/api/admin/systems/:id/ship', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Shared fulfillment: verify a paid Stripe session, mark paid, advance, email admin ──
+// Used by BOTH the success-redirect (/api/payment/confirm) and the Stripe webhook.
+// Idempotent (guards on already-paid flags), so it's safe if both fire.
+async function fulfillPaidSession(sid) {
+    if (!stripe || !sid) return { ok: false };
+    const session = await stripe.checkout.sessions.retrieve(sid, { expand: ['payment_intent.latest_charge'] });
+    if (session.payment_status !== 'paid') return { ok: false };
+    const receiptUrl = session.payment_intent?.latest_charge?.receipt_url || null;
+    const kind = session.metadata?.kind;
+    const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+
+    if (kind === 'invoice') {
+        const invoiceId = session.metadata?.invoice_id;
+        if (!invoiceId) return { ok: false };
+        const { data: inv } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
+        if (inv && inv.status !== 'paid') {
+            await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
+            if (receiptUrl) await supabase.from('invoices').update({ receipt_url: receiptUrl }).eq('id', invoiceId);
+        }
+        return { ok: true, kind };
+    }
+
+    const systemId = session.metadata?.system_id;
+    if (!systemId) return { ok: false };
+    const { data: sys } = await supabase.from('systems').select('*').eq('id', systemId).single();
+    if (!sys) return { ok: false };
+    const { data: profile } = await supabase.from('profiles').select('full_name,business_name,email').eq('id', sys.client_id).single();
+
+    if (kind === 'deposit' && !sys.deposit_paid) {
+        await supabase.from('systems').update({ deposit_paid: true, status: 'in_progress' }).eq('id', systemId);
+        if (receiptUrl) await supabase.from('systems').update({ deposit_receipt_url: receiptUrl }).eq('id', systemId);
+        if (adminEmail) mailer.sendDepositPaidEmail(adminEmail, profile, sys).catch(e => console.error('Deposit-paid email failed:', e.message));
+    } else if (kind === 'balance' && !sys.balance_paid) {
+        await supabase.from('systems').update({ balance_paid: true }).eq('id', systemId);
+        if (receiptUrl) await supabase.from('systems').update({ balance_receipt_url: receiptUrl }).eq('id', systemId);
+        if (adminEmail) mailer.sendBalancePaidEmail(adminEmail, profile, sys).catch(e => console.error('Balance-paid email failed:', e.message));
+    }
+    return { ok: true, kind };
+}
+
 // ── Client: confirm a Stripe payment (called from the success redirect) ──
 app.post('/api/payment/confirm', authClient, async (req, res) => {
     try {
         if (!stripe) return res.status(503).json({ error: 'Stripe not configured.' });
-        const { sid } = req.body;
-        if (!sid) return res.status(400).json({ error: 'Missing session id.' });
-
-        // expand to grab the Stripe-hosted receipt URL
-        const session = await stripe.checkout.sessions.retrieve(sid, { expand: ['payment_intent.latest_charge'] });
-        if (session.payment_status !== 'paid') return res.json({ ok: false });
-        const receiptUrl = session.payment_intent?.latest_charge?.receipt_url || null;
-
-        const kind = session.metadata?.kind;
-        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
-
-        // ── One-off invoice ──
-        if (kind === 'invoice') {
-            const invoiceId = session.metadata?.invoice_id;
-            if (!invoiceId) return res.json({ ok: false });
-            const { data: inv } = await supabase.from('invoices').select('*').eq('id', invoiceId).single();
-            if (!inv || inv.client_id !== req.user.id) return res.status(403).json({ error: 'Not your invoice.' });
-            if (inv.status !== 'paid') {
-                await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId);
-                if (receiptUrl) await supabase.from('invoices').update({ receipt_url: receiptUrl }).eq('id', invoiceId); // no-op pre-migration
-            }
-            return res.json({ ok: true, kind });
-        }
-
-        // ── System deposit / balance ──
-        const systemId = session.metadata?.system_id;
-        if (!systemId) return res.json({ ok: false });
-        const { data: sys } = await supabase.from('systems').select('*').eq('id', systemId).single();
-        if (!sys || sys.client_id !== req.user.id) return res.status(403).json({ error: 'Not your system.' });
-        const { data: profile } = await supabase.from('profiles').select('full_name,business_name,email').eq('id', sys.client_id).single();
-
-        if (kind === 'deposit' && !sys.deposit_paid) {
-            await supabase.from('systems').update({ deposit_paid: true, status: 'in_progress' }).eq('id', systemId);
-            if (receiptUrl) await supabase.from('systems').update({ deposit_receipt_url: receiptUrl }).eq('id', systemId);
-            if (adminEmail) mailer.sendDepositPaidEmail(adminEmail, profile, sys).catch(e => console.error('Deposit-paid email failed:', e.message));
-        } else if (kind === 'balance' && !sys.balance_paid) {
-            await supabase.from('systems').update({ balance_paid: true }).eq('id', systemId);
-            if (receiptUrl) await supabase.from('systems').update({ balance_receipt_url: receiptUrl }).eq('id', systemId);
-            if (adminEmail) mailer.sendBalancePaidEmail(adminEmail, profile, sys).catch(e => console.error('Balance-paid email failed:', e.message));
-        }
-        res.json({ ok: true, kind });
+        const result = await fulfillPaidSession(req.body.sid);
+        res.json(result);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -802,4 +820,8 @@ app.post('/api/admin/support/:threadId/reply', requireAdmin, async (req, res) =>
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.listen(PORT, () => console.log(`🌊 Harbour Automation → http://localhost:${PORT}`));
+// Listen only when run directly (local dev). On Vercel the app is imported as a handler.
+if (require.main === module) {
+    app.listen(PORT, () => console.log(`🌊 Harbour Automation → http://localhost:${PORT}`));
+}
+module.exports = app;
