@@ -336,6 +336,14 @@ app.get('/api/me/support', authClient, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Client opened Support → clear their unread flag ──
+app.post('/api/me/support/read', authClient, async (req, res) => {
+    try {
+        await supabase.from('support_threads').update({ unread_by_client: false }).eq('client_id', req.user.id);
+        res.json({ success: true });
+    } catch (e) { res.json({ success: false }); }
+});
+
 app.post('/api/me/support', authClient, async (req, res) => {
     try {
         const text = (req.body.text || '').trim();

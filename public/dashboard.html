@@ -64,6 +64,13 @@
         .pay-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
         .pay-label { font-weight: 600; color: var(--ink); }
         .pay-amt { font-size: 0.88rem; color: var(--muted); margin-top: 2px; }
+        .attn-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; margin: 6px 0 12px; }
+        .attn-card { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 12px; border: 1px solid; cursor: pointer; margin-bottom: 10px; transition: transform 0.15s; }
+        .attn-card:hover { transform: translateX(3px); }
+        .attn-ico { font-size: 1.3rem; }
+        .attn-text { font-weight: 700; color: var(--ink); }
+        .attn-sub { font-size: 0.85rem; color: var(--muted); }
+        .attn-card .arrow { margin-left: auto; color: var(--muted); font-size: 1.1rem; }
         .muted-empty { text-align: center; color: var(--muted); padding: 40px; }
 
         /* Support chat */
@@ -136,8 +143,9 @@
         <!-- OVERVIEW -->
         <section class="page active" id="page-overview">
             <h1 class="page-title">Welcome back, <span id="greet">there</span> 🌊</h1>
-            <p class="page-sub" id="overview-sub">Here's how your systems are performing.</p>
+            <p class="page-sub" id="overview-sub">Here's a snapshot of your account.</p>
             <div class="stats" id="stat-cards"></div>
+            <div id="overview-actions"></div>
             <div class="card">
                 <h3 class="sys-name">Your systems</h3>
                 <div id="overview-systems"></div>
@@ -316,15 +324,8 @@ window.updatePassword = async function () {
     document.getElementById('np-match').style.display = 'none';
 };
 
-// ── Overview ──
-const ov = await api('/api/me/overview');
-const statHTML = [
-    { ico:'📞', bg:'rgba(14,116,144,0.1)', val: ov.callsHandled, label: 'Calls handled' + (ov.period ? ' · ' + ov.period : '') },
-    { ico:'⏱️', bg:'rgba(20,184,166,0.1)', val: ov.hoursSaved + ' hrs', label: 'Time saved' },
-    { ico:'🎯', bg:'rgba(255,122,89,0.12)', val: ov.leadsCaptured, label: 'Leads captured' },
-    { ico:'⚙️', bg:'rgba(10,42,67,0.07)', val: ov.systemsLive + '/' + ov.systemsTotal, label: 'Systems live' },
-].map(s => `<div class="stat"><div class="s-ico" style="background:${s.bg};font-size:1.2rem;">${s.ico}</div><div class="s-val">${s.val}</div><div class="s-label">${s.label}</div></div>`).join('');
-document.getElementById('stat-cards').innerHTML = statHTML;
+// Overview summary is rendered after all data loads — see renderOverview() below.
+let myRequests = [];
 
 // ── Systems (shared render) ──
 const STAGE_LABEL = { waiting_deposit: 'Waiting for Deposit', in_progress: 'In Progress', payment_due: 'Payment Due', active: 'Active' };
@@ -364,6 +365,7 @@ document.getElementById('systems-list').innerHTML = sysData.systems.map(s => {
 // ── Documents / requests from the team ──
 async function loadRequests() {
     const { requests } = await api('/api/me/requests');
+    myRequests = requests || [];
     const pending = (requests || []).filter(r => r.status === 'pending').length;
     const badge = document.getElementById('doc-count');
     if (pending) { badge.style.display = 'inline-block'; badge.textContent = pending; } else badge.style.display = 'none';
@@ -438,6 +440,46 @@ function renderPayments() {
     if (!due.length && !upcoming.length && !paid.length) document.getElementById('pay-due').innerHTML = '<div class="muted-empty">No payments yet.</div>';
 }
 renderPayments();
+
+// ── Overview summary (pulls from every tab) ──
+const ovThread = (await api('/api/me/support'))?.thread || null;
+function renderOverview(thread) {
+    const active = mySystems.filter(s => s.status === 'active').length;
+    const inProg = mySystems.filter(s => s.status === 'in_progress' || s.status === 'payment_due').length;
+    let due = 0, paid = 0;
+    mySystems.forEach(s => {
+        if (!s.quote_cents) return;
+        const bal = Math.max(s.quote_cents - (s.deposit_cents || 5000), 0);
+        s.deposit_paid ? paid++ : due++;
+        if (bal > 0) { if (s.balance_paid) paid++; else if (s.status === 'payment_due') due++; }
+    });
+    myInvoices.forEach(i => i.status === 'paid' ? paid++ : due++);
+    const docs = myRequests.filter(r => r.status === 'pending').length;
+    const unreadReply = !!(thread && thread.unread_by_client);
+
+    const card = (ico, val, label, alert) => `<div class="stat"><div class="s-ico" style="background:${alert ? 'rgba(255,106,69,0.12)' : 'rgba(10,42,67,0.06)'};font-size:1.2rem;">${ico}</div><div class="s-val" style="${alert ? 'color:var(--coral-2);' : ''}">${val}</div><div class="s-label">${label}</div></div>`;
+    document.getElementById('stat-cards').innerHTML =
+        card('⚙️', active, 'Systems live', false) +
+        card('🔧', inProg, 'In progress', false) +
+        card('💳', due, 'Payments due', due > 0) +
+        card('📄', docs, 'Documents needed', docs > 0);
+
+    const actions = [];
+    if (due > 0) actions.push({ ico: '💳', text: `${due} payment${due > 1 ? 's' : ''} due`, sub: 'Settle these in your Payments tab', page: 'billing', bg: 'rgba(255,106,69,0.07)', bd: 'rgba(255,106,69,0.3)' });
+    if (docs > 0) actions.push({ ico: '📄', text: `${docs} document${docs > 1 ? 's' : ''} needed`, sub: 'Your team is waiting on these', page: 'documents', bg: 'rgba(244,162,97,0.1)', bd: 'rgba(244,162,97,0.4)' });
+    if (unreadReply) actions.push({ ico: '💬', text: 'New reply from your team', sub: 'You have an unread message in Support', page: 'support', bg: 'rgba(14,116,144,0.07)', bd: 'rgba(14,116,144,0.3)' });
+
+    const el = document.getElementById('overview-actions');
+    el.innerHTML = actions.length
+        ? `<div class="attn-label">Needs your attention</div>` + actions.map(a => `
+            <div class="attn-card" style="background:${a.bg};border-color:${a.bd};" onclick="nav('${a.page}')">
+                <span class="attn-ico">${a.ico}</span>
+                <div><div class="attn-text">${a.text}</div><div class="attn-sub">${a.sub}</div></div>
+                <span class="arrow">→</span>
+            </div>`).join('')
+        : `<div class="card" style="text-align:center;padding:28px;"><div style="font-size:1.8rem;">✅</div><div style="font-weight:700;color:var(--ink);margin-top:6px;">You're all caught up!</div><div class="meta">Nothing needs your attention right now.</div></div>`;
+}
+renderOverview(ovThread);
 
 // ── Support chat ──
 let chatLoaded = false, pollTimer = null, msgCount = 0, threadId = null;
@@ -540,6 +582,7 @@ window.nav = function (page) {
     if (page === 'support') {
         if (!chatLoaded) { chatLoaded = true; loadSupport(); }
         clearInterval(pollTimer); pollTimer = setInterval(refreshSupport, 4000);
+        api('/api/me/support/read', { method: 'POST' }).catch(() => {});
     } else { clearInterval(pollTimer); }
     if (page === 'documents') loadRequests();
     if (page === 'billing') renderPayments();
