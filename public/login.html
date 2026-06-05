@@ -28,6 +28,10 @@
         .checks li.ok { color: var(--ink); }
         .checks li.ok .sym { background: rgba(20,184,166,0.16); color: #0f766e; }
         .match { font-size: 0.82rem; margin: -4px 0 16px; font-weight: 600; }
+        .pw-wrap { position: relative; }
+        .pw-wrap input { padding-right: 62px; width: 100%; }
+        .pw-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.8rem; font-weight: 600; font-family: 'Inter', sans-serif; padding: 4px 6px; }
+        .pw-toggle:hover { color: var(--ocean); }
     </style>
 </head>
 <body>
@@ -42,10 +46,42 @@
         <h1>Welcome back</h1>
         <p class="sub">Sign in to your client dashboard.</p>
         <div class="field"><label>Email</label><input id="email" type="email" placeholder="you@business.com" /></div>
-        <div class="field"><label>Password</label><input id="password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')window._login()" /></div>
+        <div class="field"><label>Password</label>
+            <div class="pw-wrap"><input id="password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')window._login()" /><button type="button" class="pw-toggle" onclick="togglePw('password',this)">Show</button></div>
+        </div>
         <button class="btn btn-primary btn-full" id="loginBtn" onclick="window._login()">Sign in →</button>
         <div class="err" id="err"></div>
-        <p class="foot">Not a client yet? <a href="/apply.html">Apply to work with us</a></p>
+        <p class="foot"><a href="#" onclick="showForgot();return false;">Forgot password?</a></p>
+        <p class="foot" style="margin-top:8px;">Not a client yet? <a href="/apply.html">Apply to work with us</a></p>
+    </div>
+
+    <!-- FORGOT PASSWORD -->
+    <div id="forgotView" style="display:none;">
+        <h1>Reset password</h1>
+        <p class="sub">Enter your email and we'll send you a reset link.</p>
+        <div class="field"><label>Email</label><input id="f_email" type="email" placeholder="you@business.com" /></div>
+        <button class="btn btn-primary btn-full" id="forgotBtn" onclick="sendReset()">Send reset link</button>
+        <div class="err" id="ferr"></div>
+        <p class="foot"><a href="#" onclick="showLogin();return false;">← Back to sign in</a></p>
+    </div>
+
+    <!-- RESET (arrived from email link) -->
+    <div id="resetView" style="display:none;">
+        <h1>Set a new password</h1>
+        <p class="sub">Choose a new password for your account.</p>
+        <div class="field"><label>New password</label>
+            <div class="pw-wrap"><input id="r_pass" type="password" placeholder="New password" oninput="checkReset()" /><button type="button" class="pw-toggle" onclick="togglePw('r_pass',this)">Show</button></div>
+        </div>
+        <ul class="checks" id="r-checks">
+            <li data-rule="len"><span class="sym">✕</span> At least 8 characters</li>
+            <li data-rule="upper"><span class="sym">✕</span> One uppercase letter</li>
+            <li data-rule="num"><span class="sym">✕</span> One number</li>
+            <li data-rule="special"><span class="sym">✕</span> One special character</li>
+        </ul>
+        <div class="field"><label>Confirm new password</label><input id="r_pass2" type="password" placeholder="Re-enter new password" oninput="checkReset()" /></div>
+        <div class="match" id="rmatch" style="display:none;"></div>
+        <button class="btn btn-primary btn-full" id="resetBtn" onclick="doReset()" disabled>Set new password</button>
+        <div class="err" id="rerr"></div>
     </div>
 
     <!-- INVITE / SET PASSWORD -->
@@ -53,14 +89,14 @@
         <h1>Welcome aboard 🌊</h1>
         <p class="sub">Set a password to activate your account.</p>
         <div class="field"><label>Your name</label><input id="i_name" placeholder="Jane Smith" /></div>
-        <div class="field"><label>Create a password</label><input id="i_pass" type="password" placeholder="Create a password" oninput="checkPass()" /></div>
+        <div class="field"><label>Create a password</label><div class="pw-wrap"><input id="i_pass" type="password" placeholder="Create a password" oninput="checkPass()" /><button type="button" class="pw-toggle" onclick="togglePw('i_pass',this)">Show</button></div></div>
         <ul class="checks" id="checks">
             <li data-rule="len"><span class="sym">✕</span> At least 8 characters</li>
             <li data-rule="upper"><span class="sym">✕</span> One uppercase letter</li>
             <li data-rule="num"><span class="sym">✕</span> One number</li>
             <li data-rule="special"><span class="sym">✕</span> One special character</li>
         </ul>
-        <div class="field"><label>Confirm password</label><input id="i_pass2" type="password" placeholder="Re-enter your password" oninput="checkPass()" /></div>
+        <div class="field"><label>Confirm password</label><div class="pw-wrap"><input id="i_pass2" type="password" placeholder="Re-enter your password" oninput="checkPass()" /><button type="button" class="pw-toggle" onclick="togglePw('i_pass2',this)">Show</button></div></div>
         <div class="match" id="matchMsg" style="display:none;"></div>
         <button class="btn btn-primary btn-full" id="redeemBtn" onclick="window._redeem()" disabled>Activate account →</button>
         <div class="err" id="ierr"></div>
@@ -81,16 +117,56 @@ async function routeAfterAuth(session) {
     } catch { location.replace('/dashboard.html'); }
 }
 
-// Already signed in? route accordingly
-const { data: { session } } = await sb.auth.getSession();
-if (session) routeAfterAuth(session);
+// View switching
+const VIEWS = ['loginView', 'forgotView', 'resetView', 'inviteView'];
+function show(id) { VIEWS.forEach(v => document.getElementById(v).style.display = v === id ? 'block' : 'none'); }
+window.showLogin = () => show('loginView');
+window.showForgot = () => show('forgotView');
+window.togglePw = (id, btn) => { const el = document.getElementById(id); const hidden = el.type === 'password'; el.type = hidden ? 'text' : 'password'; btn.textContent = hidden ? 'Hide' : 'Show'; };
 
-// Invite mode?
+// Decide which view to show
 const inviteToken = new URLSearchParams(location.search).get('invite');
-if (inviteToken) {
-    document.getElementById('loginView').style.display = 'none';
-    document.getElementById('inviteView').style.display = 'block';
+const hash = new URLSearchParams(location.hash.slice(1));
+const isRecovery = hash.get('type') === 'recovery';
+
+if (isRecovery) {
+    show('resetView');                       // arrived from a password-reset email
+} else if (inviteToken) {
+    show('inviteView');
+} else {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) routeAfterAuth(session);
 }
+
+window.sendReset = async function () {
+    const email = document.getElementById('f_email').value.trim();
+    const btn = document.getElementById('forgotBtn'); const err = document.getElementById('ferr');
+    err.style.color = 'var(--coral-2)'; err.textContent = '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = 'Enter a valid email.'; return; }
+    btn.disabled = true; btn.textContent = 'Sending…';
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/login.html' });
+    btn.disabled = false; btn.textContent = 'Send reset link';
+    if (error) { err.textContent = error.message; return; }
+    err.style.color = '#0f766e'; err.textContent = '✓ Check your email for the reset link.';
+};
+window.checkReset = function () {
+    const p = document.getElementById('r_pass').value, p2 = document.getElementById('r_pass2').value;
+    let allOk = true;
+    document.querySelectorAll('#r-checks li').forEach(li => { const ok = PW_RULES[li.dataset.rule](p); li.classList.toggle('ok', ok); li.querySelector('.sym').textContent = ok ? '✓' : '✕'; if (!ok) allOk = false; });
+    const m = document.getElementById('rmatch'); let match = false;
+    if (p2.length === 0) { m.style.display = 'none'; }
+    else { match = p === p2; m.style.display = 'block'; m.textContent = match ? '✓ Passwords match' : '✕ Passwords don\'t match'; m.style.color = match ? '#0f766e' : 'var(--coral-2)'; }
+    document.getElementById('resetBtn').disabled = !(allOk && match);
+};
+window.doReset = async function () {
+    const p = document.getElementById('r_pass').value;
+    const btn = document.getElementById('resetBtn'); const err = document.getElementById('rerr');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const { error } = await sb.auth.updateUser({ password: p });
+    if (error) { err.style.color = 'var(--coral-2)'; err.textContent = error.message; btn.disabled = false; btn.textContent = 'Set new password'; return; }
+    err.style.color = '#0f766e'; err.textContent = '✓ Password updated! Redirecting…';
+    setTimeout(() => location.replace('/dashboard.html'), 1200);
+};
 
 window._login = async function () {
     const email = document.getElementById('email').value.trim();

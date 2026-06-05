@@ -27,3 +27,6 @@ exception when duplicate_object then null; end $$;
 alter table systems  add column if not exists deposit_receipt_url text;
 alter table systems  add column if not exists balance_receipt_url text;
 alter table invoices add column if not exists receipt_url text;
+
+-- Client email notification preferences
+alter table profiles add column if not exists notify_prefs jsonb default '{"payments":true,"documents":true,"support":true}'::jsonb;

@@ -274,6 +274,22 @@ async function authClient(req, res, next) {
 // ── Profile ──
 app.get('/api/me', authClient, (req, res) => res.json({ ...req.profile, isAdmin: req.isAdmin }));
 
+// Update my own profile (name, business, phone, email, notification prefs)
+app.patch('/api/me', authClient, async (req, res) => {
+    try {
+        const updates = {};
+        ['full_name', 'business_name', 'phone', 'email'].forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+        if (req.body.notify_prefs !== undefined) updates.notify_prefs = req.body.notify_prefs;
+        if (!Object.keys(updates).length) return res.json({ success: true });
+        const { error } = await supabase.from('profiles').update(updates).eq('id', req.user.id);
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Does this client want a given category of email? (default yes)
+const allowsEmail = (profile, cat) => { const p = profile?.notify_prefs; return !p || p[cat] !== false; };
+
 // ── Overview (stat cards) ──
 app.get('/api/me/overview', authClient, async (req, res) => {
     try {
@@ -512,8 +528,8 @@ app.post('/api/admin/clients/:id/requests', requireAdmin, async (req, res) => {
         await supabase.from('requests').insert({
             client_id: req.params.id, type: type || 'custom', title: title.trim(), description: description || '', status: 'pending',
         });
-        const { data: profile } = await supabase.from('profiles').select('full_name,email').eq('id', req.params.id).single();
-        if (profile?.email) mailer.sendDocumentRequestEmail(profile.email, profile.full_name, { title: title.trim(), description: description || '' })
+        const { data: profile } = await supabase.from('profiles').select('full_name,email,notify_prefs').eq('id', req.params.id).single();
+        if (profile?.email && allowsEmail(profile, 'documents')) mailer.sendDocumentRequestEmail(profile.email, profile.full_name, { title: title.trim(), description: description || '' })
             .catch(e => console.error('Request email failed:', e.message));
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -634,8 +650,8 @@ app.post('/api/admin/systems/:id/request-payment', requireAdmin, async (req, res
         const { data: sys } = await supabase.from('systems').select('*').eq('id', req.params.id).single();
         if (!sys) return res.status(404).json({ error: 'System not found.' });
         await supabase.from('systems').update({ status: 'payment_due' }).eq('id', req.params.id);
-        const { data: profile } = await supabase.from('profiles').select('full_name,email').eq('id', sys.client_id).single();
-        if (profile?.email) {
+        const { data: profile } = await supabase.from('profiles').select('full_name,email,notify_prefs').eq('id', sys.client_id).single();
+        if (profile?.email && allowsEmail(profile, 'payments')) {
             const bal = Math.max((sys.quote_cents || 0) - (sys.deposit_cents || 5000), 0);
             mailer.sendFinalPaymentRequestEmail(profile.email, profile.full_name, sys, bal).catch(e => console.error('Final-payment email failed:', e.message));
         }
@@ -649,8 +665,8 @@ app.post('/api/admin/systems/:id/ship', requireAdmin, async (req, res) => {
         const { data: sys } = await supabase.from('systems').select('*').eq('id', req.params.id).single();
         if (!sys) return res.status(404).json({ error: 'System not found.' });
         await supabase.from('systems').update({ status: 'active' }).eq('id', req.params.id);
-        const { data: profile } = await supabase.from('profiles').select('full_name,email').eq('id', sys.client_id).single();
-        if (profile?.email) mailer.sendShippedEmail(profile.email, profile.full_name, sys).catch(e => console.error('Shipped email failed:', e.message));
+        const { data: profile } = await supabase.from('profiles').select('full_name,email,notify_prefs').eq('id', sys.client_id).single();
+        if (profile?.email && allowsEmail(profile, 'payments')) mailer.sendShippedEmail(profile.email, profile.full_name, sys).catch(e => console.error('Shipped email failed:', e.message));
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -756,8 +772,8 @@ app.post('/api/admin/support/:threadId/reply', requireAdmin, async (req, res) =>
 
         // notify client by email
         if (thread) {
-            const { data: p } = await supabase.from('profiles').select('email,full_name').eq('id', thread.client_id).single();
-            if (p?.email) mailer.sendSupportReplyEmail(p.email, p.full_name, text).catch(e => console.error('reply email:', e.message));
+            const { data: p } = await supabase.from('profiles').select('email,full_name,notify_prefs').eq('id', thread.client_id).single();
+            if (p?.email && allowsEmail(p, 'support')) mailer.sendSupportReplyEmail(p.email, p.full_name, text).catch(e => console.error('reply email:', e.message));
         }
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
