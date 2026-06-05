@@ -682,9 +682,16 @@ window.nav = function (page) {
     } else { clearInterval(pollTimer); }
     if (page === 'documents') loadRequests();
     if (page === 'billing') renderPayments();
+    location.hash = page;   // remember tab so a refresh stays put
 };
 
 window.signOut = async function () { await sb.auth.signOut(); location.replace('/login.html'); };
+
+// Restore the tab from the URL on load (so a refresh keeps you on the same page)
+{
+    const startPage = (location.hash || '').replace('#', '');
+    if (['overview', 'systems', 'documents', 'support', 'billing', 'settings'].includes(startPage)) nav(startPage);
+}
 </script>
 </body>
 </html>

@@ -452,7 +452,7 @@ async function loadSupport() {
         <div style="flex:1;min-width:0;"><div class="name" style="font-size:1.05rem;">${esc(t.client?.business_name || t.client?.full_name || 'Client')} ${t.unread_by_admin?'<span class="badge rejected" style="background:var(--coral);color:#fff;">new</span>':''}</div>
             <div class="meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.last_message || 'No messages')}</div></div>
         <button class="btn-sm btn-soft" style="flex-shrink:0;" onclick="openThread('${t.id}','${esc(t.client?.full_name||'')}')">Open →</button>
-    </div>`).join('');
+    </div></div>`).join('');
 }
 window.openThread = async (threadId, name) => {
     supThread = threadId;
@@ -489,6 +489,7 @@ window.nav = (page) => {
     if (page === 'applications') loadApps();
     if (page === 'clients') loadClients();
     if (page === 'support') loadSupport();
+    location.hash = page;   // remember tab so a refresh stays put
 };
 window.signOut = async () => { await sb.auth.signOut(); location.replace('/login.html'); };
 
@@ -542,7 +543,9 @@ window.updatePassword = async function () {
         if (!me) return;                                  // api already redirected on 401/403
         if (!me.isAdmin) { location.replace('/dashboard.html'); return; }
         const emailEl = document.getElementById('set-email'); if (emailEl) emailEl.textContent = me.email || '';
-        await loadApps();
+        // Restore the tab from the URL (so a refresh stays on the same page)
+        const startPage = (location.hash || '').replace('#', '');
+        nav(['applications', 'clients', 'support', 'settings'].includes(startPage) ? startPage : 'applications');
         refreshBadges();
         setInterval(refreshBadges, 30000);   // keep counts current while the tab stays open
     } catch (e) {
