@@ -445,20 +445,26 @@ app.post('/api/invite/redeem', async (req, res) => {
         });
         if (cErr) return res.status(400).json({ error: cErr.message });
 
-        // Carry over business name / phone from their application
+        // Carry over business name / phone / plan from their application
         let appData = {};
         if (invite.application_id) {
-            const { data: a } = await supabase.from('applications').select('business_name,phone,full_name').eq('id', invite.application_id).single();
+            const { data: a } = await supabase.from('applications').select('business_name,phone,full_name,plan').eq('id', invite.application_id).single();
             appData = a || {};
         }
-        await supabase.from('profiles').upsert({
+        const profileRow = {
             id: created.user.id, email: invite.email,
             full_name: full_name || appData.full_name || '',
             business_name: appData.business_name || '',
             phone: appData.phone || '',
             role: 'client', status: 'active',
-        });
+        };
+        let { error: pErr } = await supabase.from('profiles').upsert({ ...profileRow, plan: appData.plan || null });
+        if (pErr && /plan|column/i.test(pErr.message)) await supabase.from('profiles').upsert(profileRow); // pre-migration fallback
         await supabase.from('invites').update({ status: 'accepted' }).eq('id', invite.id);
+
+        // Welcome email
+        mailer.sendWelcomeEmail(invite.email, profileRow.full_name).catch(e => console.error('Welcome email failed:', e.message));
+
         res.json({ success: true, email: invite.email });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -487,6 +493,12 @@ app.patch('/api/admin/applications/:id', requireAdmin, async (req, res) => {
     if (req.body.status) updates.reviewed_at = new Date().toISOString();
     const { error } = await supabase.from('applications').update(updates).eq('id', req.params.id);
     if (error) return res.status(500).json({ error: error.message });
+
+    // Gentle decline email when passing on an applicant
+    if (req.body.status === 'rejected') {
+        const { data: a } = await supabase.from('applications').select('email,full_name').eq('id', req.params.id).single();
+        if (a?.email) mailer.sendRejectionEmail(a.email, a.full_name).catch(e => console.error('Rejection email failed:', e.message));
+    }
     res.json({ success: true });
 });
 

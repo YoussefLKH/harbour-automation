@@ -299,4 +299,36 @@ async function sendApplicantConfirmationEmail(to, name) {
     return true;
 }
 
-module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail, sendDocumentRequestEmail, sendRequestFulfilledEmail, sendApplicantConfirmationEmail };
+// ── Client: welcome after activation ──
+async function sendWelcomeEmail(to, name) {
+    if (!transporter) return false;
+    const first = esc((name || 'there').split(' ')[0]);
+    const inner = `<tr><td style="padding:44px 40px;">
+        <p style="color:#0f766e;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 12px;">You're in 🎉</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.7rem;margin:0 0 16px;">Welcome aboard, ${first}!</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 22px;">Your Harbour Automation account is active. This is your home base — track your systems as we build them, handle payments, share what we need, and reach us anytime.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f6f6;border-radius:14px;"><tr><td style="padding:18px 22px;">
+          <p style="color:#0a2a43;font-size:0.82rem;font-weight:700;margin:0 0 10px;">What's next</p>
+          <p style="color:#37576b;font-size:0.9rem;line-height:1.7;margin:0;">1. We start building your first system<br>2. You'll get notified when there's a payment, document, or update<br>3. Need anything? Use Support to message or book a call</p>
+        </td></tr></table>
+        ${cta(APP() + '/dashboard.html', 'Open my dashboard →', true)}
+      </td></tr>`;
+    await transporter.sendMail({ from: FROM(), to, subject: "You're in — welcome to Harbour Automation 🌊", html: shell(inner), text: `Welcome aboard, ${first}! Your account is active. Open your dashboard: ${APP()}/dashboard.html` });
+    return true;
+}
+
+// ── Applicant: gentle decline ──
+async function sendRejectionEmail(to, name) {
+    if (!transporter) return false;
+    const first = esc((name || 'there').split(' ')[0]);
+    const inner = `<tr><td style="padding:44px 40px;">
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.5rem;margin:0 0 16px;">Thanks for applying, ${first}</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 16px;">We really appreciate you taking the time to share your business with us. After reviewing, it isn't quite the right fit for us to take on right now.</p>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 16px;">This isn't a no forever — businesses and our capacity change. We'd genuinely welcome you to reach back out down the road, and we wish you all the best.</p>
+        <p style="color:#6f8a9c;font-size:0.9rem;line-height:1.7;margin:0;">Warmly,<br>The Harbour Automation team 🌊</p>
+      </td></tr>`;
+    await transporter.sendMail({ from: FROM(), to, subject: 'Update on your Harbour Automation application', html: shell(inner), text: `Thanks for applying, ${first}. It isn't quite the right fit for us right now, but we'd welcome you to reach back out down the road. All the best — Harbour Automation.` });
+    return true;
+}
+
+module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail, sendDocumentRequestEmail, sendRequestFulfilledEmail, sendApplicantConfirmationEmail, sendWelcomeEmail, sendRejectionEmail };

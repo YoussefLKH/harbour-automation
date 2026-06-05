@@ -30,3 +30,6 @@ alter table invoices add column if not exists receipt_url text;
 
 -- Client email notification preferences
 alter table profiles add column if not exists notify_prefs jsonb default '{"payments":true,"documents":true,"support":true}'::jsonb;
+
+-- The AI plan from their application, shown back to them in the dashboard
+alter table profiles add column if not exists plan jsonb;

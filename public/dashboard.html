@@ -72,6 +72,8 @@
         .attn-text { font-weight: 700; color: var(--ink); }
         .attn-sub { font-size: 0.85rem; color: var(--muted); }
         .attn-card .arrow { margin-left: auto; color: var(--muted); font-size: 1.1rem; }
+        .plan-rec { padding: 9px 0; border-bottom: 1px solid var(--line-2); font-size: 0.9rem; color: var(--slate); }
+        .plan-rec:last-child { border-bottom: none; } .plan-rec b { color: var(--ink); } .plan-rec .imp { color: var(--ocean); font-weight: 600; }
         .muted-empty { text-align: center; color: var(--muted); padding: 40px; }
 
         /* Support chat */
@@ -153,6 +155,7 @@
             <p class="page-sub" id="overview-sub">Here's a snapshot of your account.</p>
             <div class="stats" id="stat-cards"></div>
             <div id="overview-actions"></div>
+            <div id="overview-plan"></div>
             <div class="card">
                 <h3 class="sys-name">Your systems</h3>
                 <div id="overview-systems"></div>
@@ -334,6 +337,13 @@ const prefs = me.notify_prefs || { payments: true, documents: true, support: tru
 document.getElementById('nt-payments').checked = prefs.payments !== false;
 document.getElementById('nt-documents').checked = prefs.documents !== false;
 document.getElementById('nt-support').checked = prefs.support !== false;
+
+// Show the client the AI plan from their application
+if (me.plan && (me.plan.headline || (me.plan.recommendations && me.plan.recommendations.length))) {
+    const p = me.plan;
+    const recs = (p.recommendations || []).map((r, i) => `<div class="plan-rec"><b>${i + 1}. ${esc(r.title || '')}</b> — ${esc(r.desc || '')} ${r.impact ? `<span class="imp">(${esc(r.impact)})</span>` : ''}</div>`).join('');
+    document.getElementById('overview-plan').innerHTML = `<div class="card"><div class="attn-label" style="margin:0 0 10px;">The plan we discussed</div><h3 class="sys-name" style="font-size:1.15rem;margin-bottom:4px;">${esc(p.headline || '')}</h3><p class="sys-desc" style="margin-bottom:12px;">${esc(p.summary || '')}</p>${recs}</div>`;
+}
 
 window.saveProfile = async function () {
     const msg = document.getElementById('pf-msg');
