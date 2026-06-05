@@ -271,7 +271,7 @@ window.openClient = async (id) => {
     const invHTML = invoices.map(i => `<div class="row" style="padding:10px 0;border-bottom:1px solid var(--line-2);">
         <div><b>${esc(i.description)}</b> <span class="meta">${money(i.amount_cents)}</span></div>
         <div style="display:flex;gap:8px;align-items:center;"><span class="badge ${i.status}">${i.status}</span>${i.payment_url ? `<a href="${i.payment_url}" target="_blank" class="btn-sm btn-soft">Link ↗</a>` : ''}</div>
-    </div>`).join('') || '<div class="meta">No ad-hoc invoices.</div>';
+    </div>`).join('') || '<div class="meta">No one-off charges yet.</div>';
 
     const reqBadge = st => st === 'submitted' ? 'sent' : (st === 'complete' ? 'active' : 'waiting_deposit');
     const reqHTML = (requests || []).map(r => `<div class="sys-item">
@@ -324,9 +324,10 @@ window.openClient = async (id) => {
             <div class="meta" style="margin-top:8px;">The client gets an email and sees it under their Documents tab.</div>
         </div>
 
-        <div class="card"><div class="row" style="margin-bottom:10px;"><h3 class="name" style="font-size:1.1rem;">Ad-hoc billing</h3></div>
+        <div class="card"><div class="row" style="margin-bottom:6px;"><h3 class="name" style="font-size:1.1rem;">One-off charge</h3></div>
+            <div class="meta" style="margin-bottom:12px;">For extras not tied to a system build — add-ons, small fees, etc.</div>
             ${invHTML}
-            <div class="block-label" style="margin-top:16px;">One-off charge → Stripe payment link</div>
+            <div class="block-label" style="margin-top:16px;">Charge a custom amount → Stripe payment link</div>
             <div class="grid2">
                 <div class="field"><input id="inv-desc" placeholder="e.g. Extra add-on" /></div>
                 <div class="field"><input id="inv-amt" type="number" placeholder="Amount (CAD)" min="1" step="0.01" /></div>
