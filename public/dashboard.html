@@ -464,20 +464,18 @@ function renderOverview(thread) {
         card('💳', due, 'Payments due', due > 0) +
         card('📄', docs, 'Documents needed', docs > 0);
 
-    const actions = [];
-    if (due > 0) actions.push({ ico: '💳', text: `${due} payment${due > 1 ? 's' : ''} due`, sub: 'Settle these in your Payments tab', page: 'billing', bg: 'rgba(255,106,69,0.07)', bd: 'rgba(255,106,69,0.3)' });
-    if (docs > 0) actions.push({ ico: '📄', text: `${docs} document${docs > 1 ? 's' : ''} needed`, sub: 'Your team is waiting on these', page: 'documents', bg: 'rgba(244,162,97,0.1)', bd: 'rgba(244,162,97,0.4)' });
-    if (unreadReply) actions.push({ ico: '💬', text: 'New reply from your team', sub: 'You have an unread message in Support', page: 'support', bg: 'rgba(14,116,144,0.07)', bd: 'rgba(14,116,144,0.3)' });
-
-    const el = document.getElementById('overview-actions');
-    el.innerHTML = actions.length
-        ? `<div class="attn-label">Needs your attention</div>` + actions.map(a => `
-            <div class="attn-card" style="background:${a.bg};border-color:${a.bd};" onclick="nav('${a.page}')">
-                <span class="attn-ico">${a.ico}</span>
-                <div><div class="attn-text">${a.text}</div><div class="attn-sub">${a.sub}</div></div>
-                <span class="arrow">→</span>
-            </div>`).join('')
-        : `<div class="card" style="text-align:center;padding:28px;"><div style="font-size:1.8rem;">✅</div><div style="font-weight:700;color:var(--ink);margin-top:6px;">You're all caught up!</div><div class="meta">Nothing needs your attention right now.</div></div>`;
+    // Always show every category; pending ones are highlighted, handled ones show a ✓
+    const rows = [
+        { ico: '💳', label: 'Payments', status: due > 0 ? `${due} due${paid ? ` · ${paid} paid` : ''}` : (paid > 0 ? `All caught up · ${paid} paid` : 'Nothing due'), pending: due > 0, page: 'billing' },
+        { ico: '📄', label: 'Documents', status: docs > 0 ? `${docs} needed from you` : 'None needed', pending: docs > 0, page: 'documents' },
+        { ico: '💬', label: 'Support', status: unreadReply ? 'New reply from your team' : 'No new messages', pending: unreadReply, page: 'support' },
+    ];
+    document.getElementById('overview-actions').innerHTML = `<div class="attn-label">At a glance</div>` + rows.map(r => `
+        <div class="attn-card" style="${r.pending ? 'background:rgba(255,106,69,0.07);border-color:rgba(255,106,69,0.3);' : 'background:#fff;border-color:var(--line);'}" onclick="nav('${r.page}')">
+            <span class="attn-ico">${r.ico}</span>
+            <div><div class="attn-text">${r.label}</div><div class="attn-sub" style="${r.pending ? 'color:var(--coral-2);font-weight:600;' : ''}">${r.status}</div></div>
+            <span class="arrow" style="${r.pending ? '' : 'color:#0f766e;'}">${r.pending ? '→' : '✓'}</span>
+        </div>`).join('');
 }
 renderOverview(ovThread);
 
