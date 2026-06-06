@@ -33,6 +33,11 @@
         .pw-wrap input { padding-right: 62px; width: 100%; }
         .pw-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.8rem; font-weight: 600; font-family: 'Inter', sans-serif; padding: 4px 6px; }
         .pw-toggle:hover { color: var(--ocean); }
+        @media (max-width: 480px) {
+            body { padding: 16px; align-items: flex-start; padding-top: 40px; }
+            .login-card { padding: 28px 22px; border-radius: 22px; }
+            .login-card h1 { font-size: 1.5rem; }
+        }
     </style>
 </head>
 <body>

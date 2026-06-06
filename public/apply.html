@@ -93,7 +93,16 @@
         .actions .btn { flex: 1; }
         .success-icon { width: 76px; height: 76px; border-radius: 50%; background: var(--grad-ocean); display: grid; place-items: center; margin: 0 auto 22px; color: #fff; }
         .err { color: var(--coral-2); font-size: 0.88rem; margin-top: 10px; }
-        @media (max-width:560px){ .panel{padding:26px 20px;} .field-row{grid-template-columns:1fr;} }
+        @media (max-width:560px){
+            .apply-shell { padding: 8px 16px 60px; }
+            .panel { padding: 24px 18px; }
+            .field-row { grid-template-columns: 1fr; }
+            .step h1 { font-size: 1.5rem; }
+            .actions { flex-direction: column-reverse; gap: 10px; }
+            .actions .btn { width: 100%; }
+            .calendly-inline-widget { height: 560px !important; }
+            .chat-log { max-height: 50vh; }
+        }
     </style>
 </head>
 <body>

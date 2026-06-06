@@ -33,12 +33,20 @@
             <a href="#why">Why Harbour</a>
         </div>
         <div class="nav-cta">
-            <a href="/login.html" class="nav-links" style="display:inline;font-size:0.92rem;font-weight:500;">Client Login</a>
+            <a href="/login.html" class="nav-login">Client Login</a>
             <a href="/apply.html" class="btn btn-primary">Apply Now</a>
         </div>
-        <button class="nav-burger" aria-label="Menu" onclick="document.querySelector('.nav-links').style.display = document.querySelector('.nav-links').style.display==='flex'?'none':'flex'">
+        <button class="nav-burger" aria-label="Menu" onclick="toggleMenu()">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
         </button>
+    </div>
+    <div class="nav-mobile" id="navMobile">
+        <a href="#problem" onclick="closeMenu()">The Problem</a>
+        <a href="#services" onclick="closeMenu()">What We Build</a>
+        <a href="#how" onclick="closeMenu()">How It Works</a>
+        <a href="#why" onclick="closeMenu()">Why Harbour</a>
+        <a href="/login.html" onclick="closeMenu()">Client Login</a>
+        <a href="/apply.html" class="btn btn-primary" style="width:100%;margin-top:6px;">Apply Now</a>
     </div>
 </nav>
 
@@ -264,6 +272,10 @@
     const nav = document.getElementById('nav');
     const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 20);
     window.addEventListener('scroll', onScroll); onScroll();
+
+    // Mobile menu
+    window.toggleMenu = () => nav.classList.toggle('menu-open');
+    window.closeMenu = () => nav.classList.remove('menu-open');
 
     // Hero AI demo: type → resolve, looping so it feels live
     const typing = document.getElementById('hc-typing');
