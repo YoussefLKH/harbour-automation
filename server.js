@@ -661,13 +661,20 @@ app.post('/api/admin/clients/:id/requests', requireAdmin, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Admin: mark a request complete ──
+// ── Admin: mark a request complete + email the client ──
 app.patch('/api/admin/requests/:id', requireAdmin, async (req, res) => {
     try {
         const updates = { updated_at: new Date().toISOString() };
         if (req.body.status) updates.status = req.body.status;
-        const { error } = await supabase.from('requests').update(updates).eq('id', req.params.id);
+        const { data: reqRow, error } = await supabase.from('requests').update(updates).eq('id', req.params.id).select().single();
         if (error) return res.status(500).json({ error: error.message });
+
+        if (req.body.status === 'complete' && reqRow) {
+            const { data: profile } = await supabase.from('profiles').select('full_name,email,notify_prefs').eq('id', reqRow.client_id).single();
+            if (profile?.email && allowsEmail(profile, 'documents')) {
+                mailer.sendRequestCompleteEmail(profile.email, profile.full_name, reqRow).catch(e => console.error('Request-complete email failed:', e.message));
+            }
+        }
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -734,10 +741,19 @@ async function upsertAgreement(sys) {
     const { data: existing } = await supabase.from('agreements').select('id,status').eq('system_id', sys.id).maybeSingle();
     if (existing) {
         if (existing.status !== 'signed') await supabase.from('agreements').update(snap).eq('id', existing.id);
-        return existing;
+        return { ...existing, created: false };
     }
     const { data } = await supabase.from('agreements').insert({ ...snap, status: 'pending' }).select().single();
-    return data;
+    return { ...data, created: true };
+}
+
+// Email the client that a fresh agreement is ready to sign (only on first creation, not re-quotes)
+async function notifyAgreementReady(agreement, clientId) {
+    if (!agreement?.created) return;
+    const { data: profile } = await supabase.from('profiles').select('full_name,email,notify_prefs').eq('id', clientId).single();
+    if (profile?.email && allowsEmail(profile, 'payments')) {
+        mailer.sendAgreementReadyEmail(profile.email, profile.full_name, agreement).catch(e => console.error('Agreement-ready email failed:', e.message));
+    }
 }
 
 // ── Add a system to a client (insert first, then attach deposit/balance links) ──
@@ -758,8 +774,9 @@ app.post('/api/admin/clients/:id/systems', requireAdmin, async (req, res) => {
             const { data: profile } = await supabase.from('profiles').select('email').eq('id', req.params.id).single();
             const links = await buildSystemLinks(name, quote_cents, deposit_cents, profile?.email, sys.id);
             await supabase.from('systems').update(links).eq('id', sys.id);
-            // Generate the agreement to sign (gates the deposit)
-            await upsertAgreement({ ...sys, quote_cents, deposit_cents });
+            // Generate the agreement to sign (gates the deposit) + email the client
+            const agreement = await upsertAgreement({ ...sys, quote_cents, deposit_cents });
+            await notifyAgreementReady(agreement, req.params.id);
         }
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -783,17 +800,27 @@ app.patch('/api/admin/systems/:id', requireAdmin, async (req, res) => {
                 updates.balance_url = links.balance_url;
                 // A freshly-quoted request awaits signature before the deposit
                 if (sys.status === 'requested' && req.body.status === undefined) updates.status = 'agreement';
-                // Create/refresh the agreement to sign
-                await upsertAgreement({
+                // Create/refresh the agreement to sign + email the client if it's new
+                const agreement = await upsertAgreement({
                     id: req.params.id, client_id: sys.client_id, name: sys.name,
                     description: sys.description, quote_cents,
                     deposit_cents: sys.deposit_cents,
                     eta: updates.eta !== undefined ? updates.eta : sys.eta,
                 });
+                await notifyAgreementReady(agreement, sys.client_id);
             }
         }
 
         const { error } = await supabase.from('systems').update(updates).eq('id', req.params.id);
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Admin: delete a system (and its agreement, via cascade) ──
+app.delete('/api/admin/systems/:id', requireAdmin, async (req, res) => {
+    try {
+        const { error } = await supabase.from('systems').delete().eq('id', req.params.id);
         if (error) return res.status(500).json({ error: error.message });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }

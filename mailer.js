@@ -366,4 +366,42 @@ async function sendSignedAgreementEmail(to, profile, ag, pdfBuffer, isAdmin) {
     return true;
 }
 
-module.exports = { isEmailConfigured, sendSignedAgreementEmail, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail, sendDocumentRequestEmail, sendRequestFulfilledEmail, sendApplicantConfirmationEmail, sendWelcomeEmail, sendRejectionEmail };
+// ── Client: an agreement is ready for your signature ──
+async function sendAgreementReadyEmail(to, clientName, ag) {
+    if (!transporter) return false;
+    const first = esc((clientName || 'there').split(' ')[0]);
+    const dep = Math.min(ag.deposit_cents || 5000, ag.quote_cents || 0);
+    const inner = `<tr><td style="padding:44px 40px;">
+        <p style="color:#6d28d9;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 12px;">Signature needed</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.6rem;margin:0 0 16px;">Your agreement is ready, ${first} 📝</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 16px;">We've put together the service agreement for <strong>${esc(ag.system_name)}</strong> — total ${money(ag.quote_cents)}, with a ${money(dep)} deposit to get started.</p>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 6px;">Review it and draw your signature in your dashboard's <b>Documents</b> tab. Once signed, your deposit link unlocks and we get to work.</p>
+        ${cta(APP() + '/dashboard.html#documents', 'Review & sign →')}
+      </td></tr>`;
+    await transporter.sendMail({
+        from: FROM(), to, subject: `Please sign: your agreement for ${ag.system_name}`,
+        html: shell(inner),
+        text: `${first}, your agreement for ${ag.system_name} (${money(ag.quote_cents)}, ${money(dep)} deposit) is ready to sign. Review & sign in your dashboard: ${APP()}/dashboard.html#documents`,
+    });
+    return true;
+}
+
+// ── Client: your request was marked complete ──
+async function sendRequestCompleteEmail(to, clientName, request) {
+    if (!transporter) return false;
+    const first = esc((clientName || 'there').split(' ')[0]);
+    const inner = `<tr><td style="padding:44px 40px;">
+        <p style="color:#0f766e;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 12px;">All set ✓</p>
+        <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.6rem;margin:0 0 16px;">We've wrapped up "${esc(request.title)}"</h1>
+        <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 16px;">Hey ${first}, just letting you know we've received and processed what you sent over for <strong>${esc(request.title)}</strong>. Nothing more needed from you here.</p>
+        ${cta(APP() + '/dashboard.html#documents', 'View in dashboard →', true)}
+      </td></tr>`;
+    await transporter.sendMail({
+        from: FROM(), to, subject: `✓ Done: ${request.title}`,
+        html: shell(inner),
+        text: `${first}, we've wrapped up "${request.title}" — nothing more needed from you. View: ${APP()}/dashboard.html#documents`,
+    });
+    return true;
+}
+
+module.exports = { isEmailConfigured, sendSignedAgreementEmail, sendAgreementReadyEmail, sendRequestCompleteEmail, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail, sendDocumentRequestEmail, sendRequestFulfilledEmail, sendApplicantConfirmationEmail, sendWelcomeEmail, sendRejectionEmail };
