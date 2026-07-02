@@ -33,3 +33,25 @@ alter table profiles add column if not exists notify_prefs jsonb default '{"paym
 
 -- The AI plan from their application, shown back to them in the dashboard
 alter table profiles add column if not exists plan jsonb;
+
+-- Signable service agreements (generated when you quote a system; gates the deposit)
+create table if not exists agreements (
+    id                 uuid primary key default gen_random_uuid(),
+    system_id          uuid references systems(id) on delete cascade,
+    client_id          uuid references profiles(id) on delete cascade,
+    system_name        text,
+    system_description text,
+    quote_cents        integer,
+    deposit_cents      integer,
+    eta                text,
+    status             text default 'pending',   -- pending | signed
+    signer_name        text,
+    signer_company     text,
+    signature          text,                       -- base64 PNG of the drawn signature
+    signed_at          timestamptz,
+    created_at         timestamptz default now()
+);
+alter table agreements enable row level security;
+do $$ begin
+    create policy "own agreements" on agreements for select using (auth.uid() = client_id);
+exception when duplicate_object then null; end $$;

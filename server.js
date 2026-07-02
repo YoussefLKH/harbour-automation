@@ -71,6 +71,7 @@ if (stripe) console.log('✓ Stripe connected'); else console.log('⚠ STRIPE_SE
 
 // ── Email ──
 const mailer = require('./mailer');
+const { generateAgreementPdf } = require('./pdf');
 
 // ── Health ──
 app.get('/api/health', (_req, res) => res.json({
@@ -360,6 +361,55 @@ app.post('/api/me/systems/request', authClient, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Agreements: list, sign (e-signature), and download the PDF ──
+app.get('/api/me/agreements', authClient, async (req, res) => {
+    const { data, error } = await supabase.from('agreements')
+        .select('id,system_id,system_name,quote_cents,deposit_cents,eta,status,signer_name,signer_company,signed_at,created_at')
+        .eq('client_id', req.user.id).order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ agreements: data || [] });
+});
+
+app.post('/api/me/agreements/:id/sign', authClient, async (req, res) => {
+    try {
+        const { signature, name, company } = req.body;
+        if (!signature || !String(name || '').trim()) return res.status(400).json({ error: 'A drawn signature and your name are required.' });
+        const { data: ag } = await supabase.from('agreements').select('*').eq('id', req.params.id).eq('client_id', req.user.id).single();
+        if (!ag) return res.status(404).json({ error: 'Agreement not found.' });
+        if (ag.status === 'signed') return res.json({ success: true, already: true });
+
+        const { data: updated, error } = await supabase.from('agreements').update({
+            status: 'signed', signature, signer_name: String(name).trim(),
+            signer_company: (company || '').trim() || null, signed_at: new Date().toISOString(),
+        }).eq('id', ag.id).select().single();
+        if (error) return res.status(500).json({ error: error.message });
+
+        // Unlock the deposit: the system moves from "agreement" → "waiting_deposit"
+        await supabase.from('systems').update({ status: 'waiting_deposit' }).eq('id', ag.system_id).eq('status', 'agreement');
+
+        // Email the signed PDF to admin + a copy back to the client
+        try {
+            const pdf = await generateAgreementPdf(updated);
+            const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+            if (adminEmail) mailer.sendSignedAgreementEmail(adminEmail, req.profile, updated, pdf, true).catch(e => console.error('Signed-agreement (admin) email failed:', e.message));
+            if (req.profile?.email) mailer.sendSignedAgreementEmail(req.profile.email, req.profile, updated, pdf, false).catch(e => console.error('Signed-agreement (client) email failed:', e.message));
+        } catch (e) { console.error('Agreement PDF generation failed:', e.message); }
+
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/me/agreements/:id/pdf', authClient, async (req, res) => {
+    try {
+        const { data: ag } = await supabase.from('agreements').select('*').eq('id', req.params.id).eq('client_id', req.user.id).single();
+        if (!ag) return res.status(404).send('Not found');
+        const pdf = await generateAgreementPdf(ag);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="Harbour-Agreement-${String(ag.system_name || 'system').replace(/[^a-z0-9]+/gi, '-')}.pdf"`);
+        res.send(pdf);
+    } catch (e) { res.status(500).send(e.message); }
+});
+
 app.get('/api/me/reports', authClient, async (req, res) => {
     const { data, error } = await supabase.from('reports').select('*').eq('client_id', req.user.id).order('period', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
@@ -571,16 +621,29 @@ app.get('/api/admin/clients', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/clients/:id', requireAdmin, async (req, res) => {
     const id = req.params.id;
-    const [{ data: profile }, { data: systems }, { data: invoices }, { data: thread }, { data: requests }] = await Promise.all([
+    const [{ data: profile }, { data: systems }, { data: invoices }, { data: thread }, { data: requests }, { data: agreements }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', id).single(),
         supabase.from('systems').select('*').eq('client_id', id).order('created_at'),
         supabase.from('invoices').select('*').eq('client_id', id).order('created_at', { ascending: false }),
         supabase.from('support_threads').select('*').eq('client_id', id).single(),
         supabase.from('requests').select('*').eq('client_id', id).order('created_at', { ascending: false }),
+        supabase.from('agreements').select('id,system_id,system_name,status,signer_name,signer_company,signed_at,created_at').eq('client_id', id).order('created_at', { ascending: false }),
     ]);
     let messages = [];
     if (thread) { const { data: m } = await supabase.from('support_messages').select('*').eq('thread_id', thread.id).order('created_at'); messages = m || []; }
-    res.json({ profile, systems: systems || [], invoices: invoices || [], thread: thread || null, messages, requests: requests || [] });
+    res.json({ profile, systems: systems || [], invoices: invoices || [], thread: thread || null, messages, requests: requests || [], agreements: agreements || [] });
+});
+
+// ── Admin: download any agreement PDF ──
+app.get('/api/admin/agreements/:id/pdf', requireAdmin, async (req, res) => {
+    try {
+        const { data: ag } = await supabase.from('agreements').select('*').eq('id', req.params.id).single();
+        if (!ag) return res.status(404).send('Not found');
+        const pdf = await generateAgreementPdf(ag);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="Harbour-Agreement-${String(ag.system_name || 'system').replace(/[^a-z0-9]+/gi, '-')}.pdf"`);
+        res.send(pdf);
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 // ── Admin: create a request/intake item for a client + email them ──
@@ -659,6 +722,24 @@ async function buildSystemLinks(name, quote_cents, deposit_cents, email, system_
     return { deposit_url, balance_url };
 }
 
+// Create or refresh the pending agreement snapshot for a system (one per system).
+// Skips updating a snapshot that's already been signed.
+async function upsertAgreement(sys) {
+    const snap = {
+        system_id: sys.id, client_id: sys.client_id,
+        system_name: sys.name, system_description: sys.description || '',
+        quote_cents: sys.quote_cents, deposit_cents: sys.deposit_cents || 5000,
+        eta: sys.eta || null,
+    };
+    const { data: existing } = await supabase.from('agreements').select('id,status').eq('system_id', sys.id).maybeSingle();
+    if (existing) {
+        if (existing.status !== 'signed') await supabase.from('agreements').update(snap).eq('id', existing.id);
+        return existing;
+    }
+    const { data } = await supabase.from('agreements').insert({ ...snap, status: 'pending' }).select().single();
+    return data;
+}
+
 // ── Add a system to a client (insert first, then attach deposit/balance links) ──
 app.post('/api/admin/clients/:id/systems', requireAdmin, async (req, res) => {
     try {
@@ -669,7 +750,7 @@ app.post('/api/admin/clients/:id/systems', requireAdmin, async (req, res) => {
 
         const { data: sys, error: insErr } = await supabase.from('systems').insert({
             client_id: req.params.id, name, type: type || null, description: description || '',
-            eta: eta || null, status: 'waiting_deposit', quote_cents, deposit_cents,
+            eta: eta || null, status: quote_cents ? 'agreement' : 'waiting_deposit', quote_cents, deposit_cents,
         }).select().single();
         if (insErr) return res.status(500).json({ error: insErr.message });
 
@@ -677,6 +758,8 @@ app.post('/api/admin/clients/:id/systems', requireAdmin, async (req, res) => {
             const { data: profile } = await supabase.from('profiles').select('email').eq('id', req.params.id).single();
             const links = await buildSystemLinks(name, quote_cents, deposit_cents, profile?.email, sys.id);
             await supabase.from('systems').update(links).eq('id', sys.id);
+            // Generate the agreement to sign (gates the deposit)
+            await upsertAgreement({ ...sys, quote_cents, deposit_cents });
         }
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -692,14 +775,21 @@ app.patch('/api/admin/systems/:id', requireAdmin, async (req, res) => {
         if (req.body.quote !== undefined && req.body.quote !== '') {
             const quote_cents = Math.round(parseFloat(req.body.quote) * 100);
             updates.quote_cents = quote_cents;
-            const { data: sys } = await supabase.from('systems').select('name,client_id,deposit_cents,status').eq('id', req.params.id).single();
+            const { data: sys } = await supabase.from('systems').select('name,client_id,deposit_cents,status,description,eta').eq('id', req.params.id).single();
             if (sys) {
                 const { data: profile } = await supabase.from('profiles').select('email').eq('id', sys.client_id).single();
                 const links = await buildSystemLinks(sys.name, quote_cents, sys.deposit_cents, profile?.email, req.params.id);
                 updates.deposit_url = links.deposit_url;
                 updates.balance_url = links.balance_url;
-                // A freshly-quoted request becomes "Needs Deposit"
-                if (sys.status === 'requested' && req.body.status === undefined) updates.status = 'waiting_deposit';
+                // A freshly-quoted request awaits signature before the deposit
+                if (sys.status === 'requested' && req.body.status === undefined) updates.status = 'agreement';
+                // Create/refresh the agreement to sign
+                await upsertAgreement({
+                    id: req.params.id, client_id: sys.client_id, name: sys.name,
+                    description: sys.description, quote_cents,
+                    deposit_cents: sys.deposit_cents,
+                    eta: updates.eta !== undefined ? updates.eta : sys.eta,
+                });
             }
         }
 

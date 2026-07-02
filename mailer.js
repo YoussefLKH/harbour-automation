@@ -331,4 +331,39 @@ async function sendRejectionEmail(to, name) {
     return true;
 }
 
-module.exports = { isEmailConfigured, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail, sendDocumentRequestEmail, sendRequestFulfilledEmail, sendApplicantConfirmationEmail, sendWelcomeEmail, sendRejectionEmail };
+// ── Signed agreement (PDF attached) — sent to admin + a copy to the client ──
+async function sendSignedAgreementEmail(to, profile, ag, pdfBuffer, isAdmin) {
+    if (!transporter) return false;
+    const who = esc(ag.signer_name || profile?.full_name || 'The client');
+    const biz = esc(ag.signer_company || profile?.business_name || '');
+    const when = ag.signed_at ? new Date(ag.signed_at).toLocaleString('en-CA') : '';
+    const inner = isAdmin
+        ? `<tr><td style="padding:44px 40px;">
+            <p style="color:#0e7490;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 12px;">Agreement signed</p>
+            <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.6rem;margin:0 0 16px;">${who} signed the agreement</h1>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f6f6;border-radius:14px;margin:0 0 18px;"><tr><td style="padding:18px 22px;">
+              <p style="color:#37576b;font-size:0.92rem;line-height:1.8;margin:0;">
+                <strong style="color:#0a2a43;">System:</strong> ${esc(ag.system_name)}<br>
+                ${biz ? `<strong style="color:#0a2a43;">Company:</strong> ${biz}<br>` : ''}
+                <strong style="color:#0a2a43;">Total:</strong> ${money(ag.quote_cents)}<br>
+                <strong style="color:#0a2a43;">Signed:</strong> ${esc(when)}</p>
+            </td></tr></table>
+            <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0;">The signed PDF is attached. Their deposit link is now unlocked in their dashboard.</p>
+          </td></tr>`
+        : `<tr><td style="padding:44px 40px;">
+            <p style="color:#0e7490;font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 12px;">Your signed copy</p>
+            <h1 style="color:#0a2a43;font-family:Georgia,serif;font-size:1.6rem;margin:0 0 16px;">Thanks for signing, ${esc((profile?.full_name || 'there').split(' ')[0])}</h1>
+            <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0 0 16px;">Here's your signed copy of the agreement for <strong>${esc(ag.system_name)}</strong> — attached as a PDF for your records. A copy also lives in your dashboard under Documents.</p>
+            <p style="color:#37576b;font-size:1rem;line-height:1.7;margin:0;">Next step: your ${money(Math.min(ag.deposit_cents || 5000, ag.quote_cents || 0))} deposit is now unlocked in the Payments tab. Once it's in, we get to work. 🌊</p>
+          </td></tr>`;
+    await transporter.sendMail({
+        from: FROM(), to,
+        subject: isAdmin ? `Signed: ${ag.system_name} — ${who}` : `Your signed Harbour Automation agreement`,
+        html: shell(inner),
+        text: `${who} signed the agreement for ${ag.system_name}. Signed ${when}. PDF attached.`,
+        attachments: [{ filename: `Harbour-Agreement-${String(ag.system_name || 'system').replace(/[^a-z0-9]+/gi, '-')}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }],
+    });
+    return true;
+}
+
+module.exports = { isEmailConfigured, sendSignedAgreementEmail, sendActivationEmail, sendSupportReplyEmail, sendNewApplicationEmail, sendCallBookedEmail, sendDepositPaidEmail, sendBalancePaidEmail, sendFinalPaymentRequestEmail, sendShippedEmail, sendSupportRequestEmail, sendDocumentRequestEmail, sendRequestFulfilledEmail, sendApplicantConfirmationEmail, sendWelcomeEmail, sendRejectionEmail };

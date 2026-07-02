@@ -37,6 +37,7 @@
         .badge.waiting_deposit { background: rgba(244,162,97,0.16); color: #b45309; }
         .badge.payment_due { background: rgba(255,122,89,0.16); color: var(--coral-2); }
         .badge.requested { background: rgba(14,116,144,0.12); color: #0e7490; }
+        .badge.agreement { background: rgba(139,92,246,0.16); color: #6d28d9; }
         .name { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 1.02rem; color: var(--ink); letter-spacing: -0.01em; }
         .meta { font-size: 0.85rem; color: var(--muted); }
         .btn-sm { padding: 9px 18px; font-size: 0.84rem; border-radius: 8px; border: 1.5px solid transparent; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 600; transition: all 0.15s; }
@@ -266,7 +267,7 @@ async function loadClients() {
         <button class="btn-sm btn-soft" onclick="openClient('${c.id}')">Manage →</button>
     </div></div>`).join('');
 }
-const STAGES = [['requested', 'Requested'], ['waiting_deposit', 'Waiting for Deposit'], ['in_progress', 'In Progress'], ['payment_due', 'Payment Due'], ['active', 'Active']];
+const STAGES = [['requested', 'Requested'], ['agreement', 'Awaiting Signature'], ['waiting_deposit', 'Waiting for Deposit'], ['in_progress', 'In Progress'], ['payment_due', 'Payment Due'], ['active', 'Active']];
 const stageLabel = s => (STAGES.find(([v]) => v === s) || [, s])[1];
 let currentClientId = null;
 
@@ -275,7 +276,7 @@ window.openClient = async (id) => {
     document.getElementById('clients-list').style.display = 'none';
     const d = document.getElementById('client-detail'); d.style.display = 'block';
     d.innerHTML = '<div class="muted-empty">Loading…</div>';
-    const { profile, systems, invoices, requests } = await api('/api/admin/clients/' + id);
+    const { profile, systems, invoices, requests, agreements } = await api('/api/admin/clients/' + id);
 
     const sysHTML = systems.map(s => {
         const dep = Math.min(s.deposit_cents || 5000, s.quote_cents || 0);
@@ -284,6 +285,7 @@ window.openClient = async (id) => {
         let action = '';
         if (s.status === 'requested') action = `<span class="meta" style="color:var(--ocean);font-weight:600;">🆕 Requested by the client — add a quote below to send it.</span>`;
         else if (!s.quote_cents) action = `<span class="meta" style="color:var(--coral-2);">Add a quote below to generate payment links.</span>`;
+        else if (s.status === 'agreement') action = `<span class="meta" style="color:#6d28d9;font-weight:600;">📝 Waiting for the client to sign the agreement (see Agreements below). Their deposit unlocks once signed.</span>`;
         else if (s.status === 'waiting_deposit') action = `<span class="meta">⏳ Waiting for client to pay the ${money(dep)} deposit.</span>`;
         else if (s.status === 'in_progress') action = `<button class="btn-sm btn-accept" onclick="requestPayment('${s.id}')">Request final payment</button> <span class="meta">— when the build is done.</span>`;
         else if (s.status === 'payment_due' && !s.balance_paid) action = `<span class="meta">⏳ Awaiting the ${money(bal)} balance from the client.</span>`;
@@ -328,6 +330,20 @@ window.openClient = async (id) => {
         ${r.status === 'submitted' ? `<button class="btn-sm btn-soft" style="margin-top:8px;" onclick="completeRequest('${r.id}')">Mark complete</button>` : ''}
     </div>`).join('') || '<div class="meta">No requests yet.</div>';
 
+    const agHTML = (agreements || []).map(a => {
+        const signed = a.status === 'signed';
+        return `<div class="sys-item">
+        <div class="row">
+            <div><b>📄 ${esc(a.system_name)}</b><div class="meta">${signed
+                ? `Signed ${a.signed_at ? new Date(a.signed_at).toLocaleString('en-CA') : ''}${a.signer_name ? ' · ' + esc(a.signer_name) : ''}${a.signer_company ? ' (' + esc(a.signer_company) + ')' : ''}`
+                : 'Sent to client — awaiting their signature.'}</div></div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <span class="badge ${signed ? 'active' : 'agreement'}">${signed ? 'Signed ✓' : 'Awaiting signature'}</span>
+                <button class="btn-sm btn-soft" onclick="openAdminPdf('${a.id}')">View PDF ↗</button>
+            </div>
+        </div>
+    </div>`; }).join('') || '<div class="meta">No agreements yet — add a quote to a system to generate one.</div>';
+
     d.innerHTML = `<span class="back-link" onclick="loadClients()">← All clients</span>
         <div class="card"><div class="name" style="font-size:1.4rem;">${esc(profile.business_name || profile.full_name)}</div>
             <div class="meta">${esc(profile.full_name)} · ${esc(profile.email)} · ${esc(profile.phone || '')}</div></div>
@@ -345,7 +361,12 @@ window.openClient = async (id) => {
                 <div class="field"><input id="sys-eta" placeholder="Est. completion — e.g. 2–3 weeks" /></div>
             </div>
             <button class="btn-sm btn-accept" onclick="addSystem('${id}')">Add system</button>
-            <div class="meta" style="margin-top:8px;">New systems start at <b>Waiting for Deposit</b>. Adding a quote auto-creates the $50 deposit + balance links.</div>
+            <div class="meta" style="margin-top:8px;">Adding a quote generates a signable agreement + the $50 deposit / balance links. The client signs first, then the deposit unlocks.</div>
+        </div>
+
+        <div class="card"><div class="row" style="margin-bottom:14px;"><h3 class="name" style="font-size:1.1rem;">Agreements</h3></div>
+            ${agHTML}
+            <div class="meta" style="margin-top:10px;">Generated when you quote a system. You're emailed a copy the moment the client signs.</div>
         </div>
 
         <div class="card"><div class="row" style="margin-bottom:14px;"><h3 class="name" style="font-size:1.1rem;">Requests &amp; documents</h3></div>
@@ -380,6 +401,14 @@ window.openClient = async (id) => {
             <button class="btn-sm btn-accept" onclick="createInvoice('${id}')">Generate payment link</button>
             <div id="inv-result"></div>
         </div>`;
+};
+window.openAdminPdf = async (id) => {
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        const res = await fetch('/api/admin/agreements/' + id + '/pdf', { headers: { Authorization: 'Bearer ' + session.access_token } });
+        if (!res.ok) throw new Error('Could not load the PDF.');
+        window.open(URL.createObjectURL(await res.blob()), '_blank');
+    } catch (e) { toast(e.message); }
 };
 window.updateSystem = async (id, patch) => {
     const r = await api('/api/admin/systems/' + id, { method: 'PATCH', body: JSON.stringify(patch) });

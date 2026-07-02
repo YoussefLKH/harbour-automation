@@ -53,6 +53,7 @@
         .badge.active { background: rgba(20,184,166,0.12); color: #0f766e; }
         .badge.in_progress { background: rgba(59,130,200,0.12); color: #1d4ed8; }
         .badge.waiting_deposit { background: rgba(244,162,97,0.16); color: #b45309; }
+        .badge.agreement { background: rgba(139,92,246,0.16); color: #6d28d9; }
         .badge.payment_due { background: rgba(255,122,89,0.16); color: var(--coral-2); }
         .sys-name { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--ink); margin-bottom: 4px; }
         .sys-desc { font-size: 0.9rem; color: var(--slate); }
@@ -191,7 +192,8 @@
         <!-- DOCUMENTS / REQUESTS -->
         <section class="page" id="page-documents">
             <h1 class="page-title">Documents</h1>
-            <p class="page-sub">Things your Harbour team needs from you to build and run your systems.</p>
+            <p class="page-sub">Agreements to sign and anything your Harbour team needs from you.</p>
+            <div id="agreements-list"></div>
             <div id="documents-list"></div>
         </section>
 
@@ -291,6 +293,32 @@
             </div>
         </section>
     </main>
+</div>
+
+<!-- E-SIGNATURE MODAL -->
+<div id="sign-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(10,42,67,0.55);backdrop-filter:blur(3px);padding:24px 14px;overflow-y:auto;">
+    <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(10,42,67,0.35);overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;background:linear-gradient(135deg,#0a2a43,#0e7490 60%,#14b8a6);">
+            <div style="color:#fff;font-family:Georgia,serif;font-size:1.15rem;font-weight:700;">Sign your agreement</div>
+            <button onclick="closeSign()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:1rem;cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:22px 24px;">
+            <p style="color:var(--muted);font-size:0.9rem;margin:0 0 12px;">Please read the full agreement below, then draw your signature to accept.</p>
+            <iframe id="sign-frame" style="width:100%;height:340px;border:1px solid var(--line-2);border-radius:12px;background:#f8fafb;" title="Agreement PDF"></iframe>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px;">
+                <div class="field" style="flex:1;min-width:180px;margin:0;"><label>Your full name</label><input id="sign-name" placeholder="Jane Smith" /></div>
+                <div class="field" style="flex:1;min-width:180px;margin:0;"><label>Company <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input id="sign-company" placeholder="Coastal Cuts Salon" /></div>
+            </div>
+            <label style="display:block;font-size:0.8rem;font-weight:700;color:var(--navy);margin:16px 0 6px;">Draw your signature</label>
+            <div style="position:relative;border:2px dashed var(--line-2);border-radius:12px;background:#fbfdfd;">
+                <canvas id="sign-pad" style="width:100%;height:170px;display:block;touch-action:none;cursor:crosshair;"></canvas>
+                <button onclick="clearPad()" type="button" style="position:absolute;top:8px;right:10px;background:#fff;border:1px solid var(--line-2);border-radius:8px;padding:5px 12px;font-size:0.78rem;color:var(--muted);cursor:pointer;">Clear</button>
+                <div id="sign-hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#b8c7d0;font-size:0.9rem;pointer-events:none;">✍️ Sign here</div>
+            </div>
+            <div id="sign-msg" style="margin-top:12px;font-size:0.88rem;"></div>
+            <button class="pay-btn" id="sign-submit" style="margin-top:14px;" onclick="submitSign()">Sign &amp; submit →</button>
+        </div>
+    </div>
 </div>
 
 <script src="/js/supabase.js"></script>
@@ -423,7 +451,7 @@ window.updatePassword = async function () {
 let myRequests = [];
 
 // ── Systems (shared render) ──
-const STAGE_LABEL = { requested: 'Requested', waiting_deposit: 'Needs Deposit', in_progress: 'In Progress', payment_due: 'Payment Due', active: 'Completed' };
+const STAGE_LABEL = { requested: 'Requested', agreement: 'Awaiting Signature', waiting_deposit: 'Needs Deposit', in_progress: 'In Progress', payment_due: 'Payment Due', active: 'Completed' };
 const stageLabel = s => STAGE_LABEL[s] || s;
 
 function renderSystems(list, el) {
@@ -445,6 +473,7 @@ function systemCard(s) {
     const bal = Math.max((s.quote_cents || 0) - (s.deposit_cents || 5000), 0);
     let note = '', extra = '', badge = stageLabel(s.status);
     if (s.status === 'requested') extra = `<div class="sys-eta" style="color:var(--ocean);">✓ Request received — we'll review it and send you a quote soon.</div>`;
+    else if (s.status === 'agreement') note = `<div class="sys-eta" style="color:var(--coral-2);">📝 Please review &amp; sign your agreement in the <b>Documents</b> tab to unlock your deposit.</div>`;
     else if (s.status === 'waiting_deposit') note = `<div class="sys-eta" style="color:var(--coral-2);">💳 ${money(dep)} deposit due — pay it in your <b>Payments</b> tab to start the build.</div>`;
     else if (s.status === 'payment_due' && !s.balance_paid) note = `<div class="sys-eta" style="color:var(--coral-2);">💳 Your system is ready! ${money(bal)} balance due — pay it in your <b>Payments</b> tab.</div>`;
     else if (s.status === 'payment_due' && s.balance_paid) { badge = 'Preparing Delivery'; extra = `<div class="sys-eta" style="color:#0f766e;">✓ Payment received — we're preparing your delivery.</div>`; }
@@ -462,7 +491,7 @@ function systemCard(s) {
 }
 function renderClientSystems() {
     // Filter tabs: All + any status that has systems
-    const order = ['requested', 'waiting_deposit', 'in_progress', 'payment_due', 'active'];
+    const order = ['requested', 'agreement', 'waiting_deposit', 'in_progress', 'payment_due', 'active'];
     const present = order.filter(st => mySystems.some(s => s.status === st));
     const tabs = [['all', 'All']].concat(present.map(st => [st, stageLabel(st)]));
     document.getElementById('sys-filters').innerHTML = mySystems.length > 1 ? tabs.map(([v, l]) => {
@@ -541,6 +570,86 @@ window.submitResponse = async function (id) {
     if (!response && !response_url) return;
     await api('/api/me/requests/' + id + '/respond', { method: 'POST', body: JSON.stringify({ response, response_url }) });
     await loadRequests();
+    updateDocBadge();
+};
+
+// ── Agreements: list + draw-to-sign ──
+let myAgreements = [];
+function updateDocBadge() {
+    const n = (myRequests || []).filter(r => r.status === 'pending').length + (myAgreements || []).filter(a => a.status === 'pending').length;
+    const badge = document.getElementById('doc-count');
+    if (n) { badge.style.display = 'inline-block'; badge.textContent = n; } else badge.style.display = 'none';
+}
+async function loadAgreements() {
+    try { myAgreements = (await api('/api/me/agreements')).agreements || []; } catch { myAgreements = []; }
+    const el = document.getElementById('agreements-list');
+    el.innerHTML = myAgreements.map(a => {
+        const signed = a.status === 'signed';
+        return `<div class="card" style="margin-bottom:14px;${signed ? '' : 'border:1.5px solid rgba(139,92,246,0.45);'}">
+            <div class="card-row" style="align-items:flex-start;">
+                <div><div class="sys-name" style="font-size:1.05rem;">📄 Service Agreement — ${esc(a.system_name)}</div>
+                     <div class="sys-desc">${signed
+                        ? `Signed ${a.signed_at ? new Date(a.signed_at).toLocaleDateString('en-CA') : ''}${a.signer_name ? ' by ' + esc(a.signer_name) : ''}.`
+                        : 'Please review and sign to unlock your deposit and start the build.'}</div></div>
+                <span class="badge ${signed ? 'active' : 'agreement'}">${signed ? 'Signed ✓' : 'Sign needed'}</span>
+            </div>
+            ${signed
+                ? `<button class="pay-btn" style="margin-top:12px;background:var(--grad-ocean);box-shadow:none;" onclick="openAgreementPdf('${a.id}')">View signed PDF ↗</button>`
+                : `<button class="pay-btn" style="margin-top:12px;" onclick="openSign('${a.id}')">📝 Review &amp; sign →</button>`}
+        </div>`;
+    }).join('');
+    updateDocBadge();
+}
+await loadAgreements();
+
+// authed fetch of a protected PDF → object URL
+async function fetchPdfUrl(path) {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(path, { headers: { 'Authorization': `Bearer ${session.access_token}` } });
+    if (!res.ok) throw new Error('Could not load the PDF.');
+    return URL.createObjectURL(await res.blob());
+}
+window.openAgreementPdf = async function (id) {
+    try { window.open(await fetchPdfUrl('/api/me/agreements/' + id + '/pdf'), '_blank'); }
+    catch (e) { alert(e.message); }
+};
+
+// signature pad
+let signId = null, padCtx = null, drawing = false, hasInk = false;
+window.openSign = async function (id) {
+    signId = id; hasInk = false;
+    document.getElementById('sign-name').value = me?.full_name || '';
+    document.getElementById('sign-company').value = me?.business_name || '';
+    document.getElementById('sign-msg').textContent = '';
+    document.getElementById('sign-hint').style.display = 'flex';
+    document.getElementById('sign-modal').style.display = 'block';
+    try { document.getElementById('sign-frame').src = await fetchPdfUrl('/api/me/agreements/' + id + '/pdf'); } catch {}
+    const c = document.getElementById('sign-pad');
+    c.width = c.clientWidth; c.height = 170;
+    padCtx = c.getContext('2d');
+    padCtx.lineWidth = 2.4; padCtx.lineCap = 'round'; padCtx.lineJoin = 'round'; padCtx.strokeStyle = '#0a2a43';
+    const pos = e => { const r = c.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: (t.clientX - r.left) * (c.width / r.width), y: (t.clientY - r.top) * (c.height / r.height) }; };
+    c.onpointerdown = e => { drawing = true; const p = pos(e); padCtx.beginPath(); padCtx.moveTo(p.x, p.y); e.preventDefault(); };
+    c.onpointermove = e => { if (!drawing) return; const p = pos(e); padCtx.lineTo(p.x, p.y); padCtx.stroke(); hasInk = true; document.getElementById('sign-hint').style.display = 'none'; e.preventDefault(); };
+    c.onpointerup = () => { drawing = false; };
+    c.onpointerleave = () => { drawing = false; };
+};
+window.clearPad = function () { const c = document.getElementById('sign-pad'); if (padCtx) padCtx.clearRect(0, 0, c.width, c.height); hasInk = false; document.getElementById('sign-hint').style.display = 'flex'; };
+window.closeSign = function () { document.getElementById('sign-modal').style.display = 'none'; document.getElementById('sign-frame').src = 'about:blank'; };
+window.submitSign = async function () {
+    const msg = document.getElementById('sign-msg');
+    const name = document.getElementById('sign-name').value.trim();
+    if (!name) { msg.style.color = 'var(--coral-2)'; msg.textContent = 'Please enter your name.'; return; }
+    if (!hasInk) { msg.style.color = 'var(--coral-2)'; msg.textContent = 'Please draw your signature above.'; return; }
+    const signature = document.getElementById('sign-pad').toDataURL('image/png');
+    const btn = document.getElementById('sign-submit'); btn.disabled = true; btn.textContent = 'Submitting…';
+    const r = await api('/api/me/agreements/' + signId + '/sign', { method: 'POST', body: JSON.stringify({ signature, name, company: document.getElementById('sign-company').value.trim() }) });
+    if (!r?.success) { msg.style.color = 'var(--coral-2)'; msg.textContent = r?.error || 'Could not submit.'; btn.disabled = false; btn.textContent = 'Sign & submit →'; return; }
+    msg.style.color = '#0f766e'; msg.textContent = '✓ Signed! Your deposit is now unlocked in the Payments tab.';
+    const ag = myAgreements.find(a => a.id === signId);
+    if (ag) { ag.status = 'signed'; ag.signer_name = name; ag.signed_at = new Date().toISOString(); }
+    const sys = mySystems.find(s => s.id === ag?.system_id); if (sys) sys.status = 'waiting_deposit';
+    setTimeout(() => { closeSign(); loadAgreements(); renderClientSystems(); renderPayments(); btn.disabled = false; btn.textContent = 'Sign & submit →'; }, 1200);
 };
 
 // ── Payments — pay due items, view receipts ──
@@ -552,7 +661,7 @@ function renderPayments() {
         if (!s.quote_cents) return;
         const dep = Math.min(s.deposit_cents || 5000, s.quote_cents);
         const bal = Math.max(s.quote_cents - (s.deposit_cents || 5000), 0);
-        items.push({ label: `Deposit — ${esc(s.name)}`, amount: dep, state: s.deposit_paid ? 'paid' : 'due', payUrl: s.deposit_url, receipt: s.deposit_receipt_url });
+        items.push({ label: `Deposit — ${esc(s.name)}`, amount: dep, state: s.deposit_paid ? 'paid' : (s.status === 'agreement' ? 'upcoming' : 'due'), payUrl: s.deposit_url, receipt: s.deposit_receipt_url });
         if (bal > 0) items.push({ label: `Balance — ${esc(s.name)}`, amount: bal, state: s.balance_paid ? 'paid' : (s.status === 'payment_due' ? 'due' : 'upcoming'), payUrl: s.balance_url, receipt: s.balance_receipt_url });
     });
     myInvoices.forEach(i => items.push({ label: esc(i.description || 'Charge'), amount: i.amount_cents, state: i.status === 'paid' ? 'paid' : 'due', payUrl: i.payment_url, receipt: i.receipt_url }));
@@ -742,7 +851,7 @@ window.nav = function (page) {
         clearInterval(pollTimer); pollTimer = setInterval(refreshSupport, 4000);
         api('/api/me/support/read', { method: 'POST' }).catch(() => {});
     } else { clearInterval(pollTimer); }
-    if (page === 'documents') loadRequests();
+    if (page === 'documents') { loadRequests(); loadAgreements(); }
     if (page === 'billing') renderPayments();
     location.hash = page;   // remember tab so a refresh stays put
 };

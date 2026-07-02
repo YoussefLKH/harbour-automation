@@ -20,3 +20,7 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+server.log
+server.err.log
+scratch-*
