@@ -247,7 +247,7 @@ app.post('/api/apply/submit', async (req, res) => {
         }
 
         // Notify the team of the new application (non-blocking)
-        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        const adminEmail = adminRecipients();
         if (adminEmail) mailer.sendNewApplicationEmail(adminEmail, record).catch(e => console.error('New-application email failed:', e.message));
         // Confirm to the applicant so they're not left hanging
         if (record.email) mailer.sendApplicantConfirmationEmail(record.email, record.full_name).catch(e => console.error('Applicant confirmation failed:', e.message));
@@ -263,7 +263,7 @@ app.post('/api/apply/submit', async (req, res) => {
 app.post('/api/apply/booked', async (req, res) => {
     try {
         const a = req.body || {};
-        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        const adminEmail = adminRecipients();
         if (adminEmail) mailer.sendCallBookedEmail(adminEmail, a).catch(e => console.error('Call-booked email failed:', e.message));
         res.json({ success: true });
     } catch (e) {
@@ -277,6 +277,8 @@ app.post('/api/apply/booked', async (req, res) => {
 // we verify it and use the service role for DB work.
 // ════════════════════════════════════════════════════════════
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+// All configured admins, comma-separated for nodemailer's `to` field (falls back to EMAIL_USER if none set)
+const adminRecipients = () => ADMIN_EMAILS.length ? ADMIN_EMAILS.join(',') : (process.env.EMAIL_USER || '');
 
 async function authClient(req, res, next) {
     if (!supabase) return res.status(503).json({ error: 'Database not configured.' });
@@ -352,7 +354,7 @@ app.post('/api/me/systems/request', authClient, async (req, res) => {
         });
         if (error) return res.status(500).json({ error: error.message });
 
-        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        const adminEmail = adminRecipients();
         if (adminEmail) {
             const body = `Looking for: ${type || '—'}\nWhat they need: ${need || ''}${notes ? `\nNotes: ${notes}` : ''}`;
             mailer.sendSupportRequestEmail(adminEmail, req.profile, 'new_system', body).catch(e => console.error('System-request email failed:', e.message));
@@ -390,7 +392,7 @@ app.post('/api/me/agreements/:id/sign', authClient, async (req, res) => {
         // Email the signed PDF to admin + a copy back to the client
         try {
             const pdf = await generateAgreementPdf(updated);
-            const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+            const adminEmail = adminRecipients();
             if (adminEmail) mailer.sendSignedAgreementEmail(adminEmail, req.profile, updated, pdf, true).catch(e => console.error('Signed-agreement (admin) email failed:', e.message));
             if (req.profile?.email) mailer.sendSignedAgreementEmail(req.profile.email, req.profile, updated, pdf, false).catch(e => console.error('Signed-agreement (client) email failed:', e.message));
         } catch (e) { console.error('Agreement PDF generation failed:', e.message); }
@@ -508,7 +510,7 @@ app.post('/api/me/support/request', authClient, async (req, res) => {
         }
 
         // Email the admin for actionable requests (new lead / something broken)
-        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        const adminEmail = adminRecipients();
         if (adminEmail && (category === 'new_system' || category === 'problem')) {
             mailer.sendSupportRequestEmail(adminEmail, req.profile, category, body).catch(e => console.error('Support-request email failed:', e.message));
         }
@@ -698,7 +700,7 @@ app.post('/api/me/requests/:id/respond', authClient, async (req, res) => {
             response: response || '', response_url: response_url || '', status: 'submitted', updated_at: new Date().toISOString(),
         }).eq('id', req.params.id);
 
-        const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+        const adminEmail = adminRecipients();
         if (adminEmail) mailer.sendRequestFulfilledEmail(adminEmail, req.profile, reqRow, response || '', response_url || '')
             .catch(e => console.error('Request-fulfilled email failed:', e.message));
         res.json({ success: true });
@@ -862,7 +864,7 @@ async function fulfillPaidSession(sid) {
     if (session.payment_status !== 'paid') return { ok: false };
     const receiptUrl = session.payment_intent?.latest_charge?.receipt_url || null;
     const kind = session.metadata?.kind;
-    const adminEmail = ADMIN_EMAILS[0] || process.env.EMAIL_USER;
+    const adminEmail = adminRecipients();
 
     if (kind === 'invoice') {
         const invoiceId = session.metadata?.invoice_id;
